@@ -4,6 +4,13 @@ import type { Folder, Paper, Tag } from '../api/types'
 
 const TAG_COLORS = ['#f97316', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#14b8a6']
 
+function paperSourceLink(p: Paper): { href: string; icon: string; label: string } | null {
+  if (p.doi) return { href: `https://doi.org/${p.doi}`, icon: '🔗', label: 'View via DOI' }
+  if (p.sourceUrl) return { href: p.sourceUrl, icon: '🌐', label: 'View source' }
+  if (p.ingestionStatus === 'ready') return { href: `/api/references/papers/${p.id}/pdf`, icon: '📄', label: 'View stored PDF' }
+  return null
+}
+
 export function ReferenceManager() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
@@ -191,11 +198,26 @@ export function ReferenceManager() {
 
         {papers.length === 0 && <div className="empty-state" style={{ margin: 20 }}>No papers yet. Use "Add Papers" to get started.</div>}
 
-        {papers.map((p) => (
+        {papers.map((p) => {
+          const link = paperSourceLink(p)
+          return (
           <div key={p.id} className="paper-row">
             <input type="checkbox" style={{ marginTop: 3 }} readOnly checked={false} />
             <div className="paper-row-main">
-              <div className="paper-row-title">{p.title}</div>
+              {link ? (
+                <a
+                  className="paper-row-title paper-row-title-link"
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={link.label}
+                >
+                  {p.title}
+                  <span className="paper-row-title-icon">{link.icon}</span>
+                </a>
+              ) : (
+                <div className="paper-row-title">{p.title}</div>
+              )}
               <div className="paper-row-meta">
                 {p.type} · {p.year ?? '—'} · {p.authors.slice(0, 3).join(', ')}
                 {p.authors.length > 3 ? ` +${p.authors.length - 3} more` : ''}
@@ -245,7 +267,8 @@ export function ReferenceManager() {
               🗑
             </button>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {modal === 'upload-url' && <UploadUrlModal folderId={activeFolderId} onClose={() => setModal(null)} onDone={refreshPapers} />}

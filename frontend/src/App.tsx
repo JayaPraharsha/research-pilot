@@ -2,7 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { Dashboard } from './pages/Dashboard'
 import { ReferenceManager } from './pages/ReferenceManager'
-import { ChatWithPdf } from './pages/ChatWithPdf'
+import { ChatThread } from './pages/ChatThread'
 import { MyChats } from './pages/MyChats'
 import { MyNotebooks } from './pages/MyNotebooks'
 
@@ -14,7 +14,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/references" element={<ReferenceManager />} />
-          <Route path="/chats/:chatId" element={<ChatWithPdf />} />
+          <Route path="/chats/:chatId" element={<ChatThread />} />
           <Route path="/my-chats" element={<MyChats />} />
           <Route path="/my-notebooks" element={<MyNotebooks />} />
         </Routes>

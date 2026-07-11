@@ -30,6 +30,7 @@ async def ensure_indexes() -> None:
     await paper_chunks.create_index("paperId")
     await folders.create_index("parentId")
     await chats.create_index("updatedAt")
+    await chats.create_index("type")
     await notebooks.create_index("createdAt")
 
     try:

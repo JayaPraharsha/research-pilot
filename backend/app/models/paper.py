@@ -31,6 +31,19 @@ class UrlPaperCreate(BaseModel):
     folderId: str | None = None
 
 
+class FromSearchPaperCreate(BaseModel):
+    title: str
+    authors: list[str] = []
+    year: int | None = None
+    venue: str | None = None
+    doi: str | None = None
+    abstract: str | None = None
+    citationCount: int | None = None
+    url: str | None = None
+    pdfUrl: str | None = None
+    folderId: str | None = None
+
+
 class PaperUpdate(BaseModel):
     folderId: str | None = None
     tagIds: list[str] | None = None

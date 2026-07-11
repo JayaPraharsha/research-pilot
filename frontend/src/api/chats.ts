@@ -1,20 +1,32 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { api } from './client'
-import type { Chat, ChatSummary } from './types'
+import type { Chat, ChatSummary, ChatType, DeepResearchScope, MessageOutput } from './types'
 
 export const chatsApi = {
-  list: () => api.get<ChatSummary[]>('/chats'),
+  list: (type?: ChatType) => api.get<ChatSummary[]>(`/chats${type ? `?type=${type}` : ''}`),
   get: (id: string) => api.get<Chat>(`/chats/${id}`),
-  create: (sourcePaperIds: string[], title?: string) =>
-    api.post<Chat>('/chats', { sourcePaperIds, title }),
+  create: (params: {
+    type?: ChatType
+    sourceFolderIds?: string[]
+    sourcePaperIds?: string[]
+    title?: string
+    deepResearchScope?: DeepResearchScope
+  }) => api.post<Chat>('/chats', params),
   rename: (id: string, title: string) => api.patch<Chat>(`/chats/${id}`, { title }),
   remove: (id: string) => api.delete(`/chats/${id}`),
-  addSource: (id: string, paperId: string) => api.post<Chat>(`/chats/${id}/sources`, { paperId }),
+  addSource: (id: string, params: { paperId?: string; folderId?: string }) =>
+    api.post<Chat>(`/chats/${id}/sources`, params),
 
   streamMessage: (
     chatId: string,
     content: string,
-    handlers: { onDelta: (text: string) => void; onDone: (fullText: string) => void; onError: (err: unknown) => void },
+    handlers: {
+      onOutput?: (output: MessageOutput) => void
+      onStage?: (stage: { stage: string; status: string; detail?: string }) => void
+      onDelta: (text: string) => void
+      onDone: (fullText: string) => void
+      onError: (err: unknown) => void
+    },
   ) => {
     const controller = new AbortController()
     fetchEventSource(`/api/chats/${chatId}/messages`, {
@@ -23,9 +35,21 @@ export const chatsApi = {
       body: JSON.stringify({ content }),
       signal: controller.signal,
       onmessage(ev) {
-        const payload = JSON.parse(ev.data) as { delta?: string; done?: boolean; content?: string }
+        const payload = JSON.parse(ev.data) as {
+          delta?: string
+          done?: boolean
+          content?: string
+          output?: MessageOutput
+          stage?: string
+          status?: string
+          detail?: string
+          error?: string
+        }
+        if (payload.output) handlers.onOutput?.(payload.output)
+        if (payload.stage) handlers.onStage?.({ stage: payload.stage, status: payload.status!, detail: payload.detail })
         if (payload.delta) handlers.onDelta(payload.delta)
         if (payload.done) handlers.onDone(payload.content ?? '')
+        if (payload.error) handlers.onError(new Error(payload.error))
       },
       onerror(err) {
         handlers.onError(err)

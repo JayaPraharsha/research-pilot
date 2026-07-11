@@ -1,9 +1,19 @@
+from pathlib import Path
+
 from bson import ObjectId
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from app.db.mongo import folders, papers, tags
 from app.models.common import serialize_doc, utcnow
-from app.models.paper import IngestionStatus, ManualPaperCreate, PaperSource, PaperUpdate, UrlPaperCreate
+from app.models.paper import (
+    FromSearchPaperCreate,
+    IngestionStatus,
+    ManualPaperCreate,
+    PaperSource,
+    PaperUpdate,
+    UrlPaperCreate,
+)
 from app.models.reference import FolderCreate, FolderUpdate, TagCreate
 from app.services.ingestion import (
     fetch_crossref_metadata,
@@ -136,6 +146,14 @@ async def delete_paper(paper_id: str):
     await papers.delete_one({"_id": ObjectId(paper_id)})
 
 
+@router.get("/papers/{paper_id}/pdf")
+async def get_paper_pdf(paper_id: str):
+    doc = await papers.find_one({"_id": ObjectId(paper_id)})
+    if not doc or not doc.get("pdfPath") or not Path(doc["pdfPath"]).is_file():
+        raise HTTPException(404, "No stored PDF for this paper")
+    return FileResponse(doc["pdfPath"], media_type="application/pdf")
+
+
 async def _create_paper_stub(
     title: str,
     authors: list[str],
@@ -144,6 +162,8 @@ async def _create_paper_stub(
     doi: str | None,
     folder_id: str | None,
     source: PaperSource,
+    abstract: str | None = None,
+    source_url: str | None = None,
 ) -> str:
     doc = {
         "title": title,
@@ -151,6 +171,8 @@ async def _create_paper_stub(
         "year": year,
         "venue": venue,
         "doi": doi,
+        "abstract": abstract,
+        "sourceUrl": source_url,
         "folderId": ObjectId(folder_id) if folder_id else None,
         "tagIds": [],
         "type": "Journal Article",
@@ -194,6 +216,7 @@ async def upload_url(body: UrlPaperCreate):
 
     metadata = {"title": body.url or body.doi, "authors": [], "year": None, "venue": None}
     pdf_bytes: bytes | None = None
+    source_url = body.url
 
     if body.doi:
         try:
@@ -203,6 +226,7 @@ async def upload_url(body: UrlPaperCreate):
         oa_url = await find_oa_pdf_url(body.doi)
         if oa_url:
             pdf_bytes = await download_bytes(oa_url)
+            source_url = source_url or oa_url
     elif body.url:
         pdf_bytes = await download_bytes(body.url)
 
@@ -214,6 +238,7 @@ async def upload_url(body: UrlPaperCreate):
         doi=body.doi,
         folder_id=body.folderId,
         source=PaperSource.url,
+        source_url=source_url,
     )
 
     if pdf_bytes:
@@ -243,5 +268,39 @@ async def add_manual(body: ManualPaperCreate):
     await papers.update_one(
         {"_id": ObjectId(paper_id)}, {"$set": {"ingestionStatus": IngestionStatus.no_pdf.value}}
     )
+    doc = await papers.find_one({"_id": ObjectId(paper_id)})
+    return serialize_doc(doc)
+
+
+@router.post("/papers/from-search", status_code=201)
+async def add_from_search(body: FromSearchPaperCreate):
+    """Save a specific AI Search result into Reference Manager. Unlike upload-url, the
+    caller already has full metadata and (possibly) a direct PDF URL from the search
+    provider, so no Crossref/Unpaywall round-trip is needed.
+    """
+    paper_id = await _create_paper_stub(
+        title=body.title,
+        authors=body.authors,
+        year=body.year,
+        venue=body.venue,
+        doi=body.doi,
+        folder_id=body.folderId,
+        source=PaperSource.url,
+        abstract=body.abstract,
+        source_url=body.url or body.pdfUrl,
+    )
+    if body.citationCount is not None:
+        await papers.update_one({"_id": ObjectId(paper_id)}, {"$set": {"citationCount": body.citationCount}})
+
+    pdf_bytes = await download_bytes(body.pdfUrl) if body.pdfUrl else None
+    if pdf_bytes:
+        pdf_path = save_pdf_bytes(pdf_bytes)
+        await papers.update_one({"_id": ObjectId(paper_id)}, {"$set": {"pdfPath": pdf_path}})
+        await ingest_paper(paper_id, pdf_path)
+    else:
+        await papers.update_one(
+            {"_id": ObjectId(paper_id)}, {"$set": {"ingestionStatus": IngestionStatus.no_pdf.value}}
+        )
+
     doc = await papers.find_one({"_id": ObjectId(paper_id)})
     return serialize_doc(doc)

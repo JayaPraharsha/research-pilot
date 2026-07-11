@@ -40,4 +40,16 @@ export const referencesApi = {
     doi?: string
     folderId?: string | null
   }) => api.post<Paper>('/references/papers/manual', body),
+  saveFromSearch: (body: {
+    title: string
+    authors?: string[]
+    year?: number | null
+    venue?: string | null
+    doi?: string | null
+    abstract?: string | null
+    citationCount?: number | null
+    url?: string | null
+    pdfUrl?: string | null
+    folderId?: string | null
+  }) => api.post<Paper>('/references/papers/from-search', body),
 }

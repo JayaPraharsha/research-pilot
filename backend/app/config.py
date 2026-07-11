@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     top_k_per_paper: int = 5
     full_text_fallback_token_threshold: int = 6000
     full_text_fallback_max_papers: int = 3
+    per_paper_retrieval_max_papers: int = 6
+    global_retrieval_top_n: int = 25
+    search_result_limit: int = 20
+    deep_research_screen_keep: int = 15
     cors_origins: str = "http://localhost:5173"
 
     @property

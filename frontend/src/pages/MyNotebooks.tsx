@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { notebooksApi } from '../api/notebooks'
 import type { Notebook } from '../api/types'
+import { Markdown } from '../components/Markdown'
 
 export function MyNotebooks() {
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
@@ -65,7 +66,7 @@ export function MyNotebooks() {
               <div style={{ border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 16 }}>
                 {snapshot.map((m, i) => (
                   <div key={i} className={`chat-bubble ${m.role}`} style={{ marginBottom: 10 }}>
-                    {m.content}
+                    {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
                   </div>
                 ))}
               </div>
