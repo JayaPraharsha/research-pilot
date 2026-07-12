@@ -750,7 +750,7 @@ a.paper-row-title-link:hover .paper-row-title-icon {
 .chat-sources {
   width: 300px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
   padding: 16px;
   overflow-y: auto;
 }
@@ -786,6 +786,7 @@ a.paper-row-title-link:hover .paper-row-title-icon {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .chat-messages {
@@ -1059,9 +1060,15 @@ a.paper-row-title-link:hover .paper-row-title-icon {
 
 .quick-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 8px;
   padding: 0 20px 12px;
+}
+
+.quick-actions .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .chat-input-bar {
@@ -1129,6 +1136,49 @@ a.paper-row-title-link:hover .paper-row-title-icon {
   opacity: 1;
 }
 
+/* ---------- Excerpt-grounded quote bubble ---------- */
+
+.chat-bubble-excerpt {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.chat-pending-excerpt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-left: 3px solid var(--accent, #2582f6);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.chat-pending-excerpt span {
+  flex: 1;
+}
+
+.chat-pending-excerpt button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  line-height: 1;
+  padding: 0;
+}
+
+.chat-pending-excerpt button:hover {
+  color: var(--text);
+}
+
 /* ---------- Save-to-note modal tabs ---------- */
 
 .notes-modal-tabs {
@@ -1166,7 +1216,7 @@ a.paper-row-title-link:hover .paper-row-title-icon {
 .notes-panel--panel {
   width: 360px;
   flex-shrink: 0;
-  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
 }
 
 .notes-panel--page {
@@ -1387,4 +1437,138 @@ a.paper-row-title-link:hover .paper-row-title-icon {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ---------- Paper Reader ---------- */
+
+.reader-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.reader-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.reader-chat-pane {
+  width: 400px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.reader-paper-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.reader-chat-header {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* ---------- PDF viewer ---------- */
+
+.pdf-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pdf-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pdf-viewer-page-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-width: 100px;
+  text-align: center;
+}
+
+.pdf-viewer-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  background: var(--bg-subtle);
+}
+
+.pdf-viewer-scroll .react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pdf-page-container {
+  position: relative;
+  height: fit-content;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.pdf-highlight {
+  position: absolute;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.pdf-selection-toolbar {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--text);
+  border-radius: var(--radius-full);
+  padding: 6px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.pdf-selection-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.pdf-selection-swatch:hover {
+  transform: scale(1.12);
+}
+
+.pdf-selection-ask-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  color: white;
+  font-size: 12.5px;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pdf-selection-ask-ai:hover {
+  background: rgba(255, 255, 255, 0.15);
 }

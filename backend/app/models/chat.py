@@ -36,8 +36,15 @@ class ChatCreate(BaseModel):
     searchScope: SearchScope | None = None
 
 
+class ExcerptRef(BaseModel):
+    paperId: str
+    quote: str
+    page: int
+
+
 class MessageCreate(BaseModel):
     content: str
+    excerpt: ExcerptRef | None = None
 
 
 class AddSourceRequest(BaseModel):

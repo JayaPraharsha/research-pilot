@@ -13,13 +13,20 @@ from app.models.chat import (
     ChatType,
     DeepResearchMode,
     DeepResearchScope,
+    ExcerptRef,
     MessageCreate,
     SearchScope,
 )
 from app.models.common import serialize_doc, utcnow
 from app.services.deep_research import run_openai_deep_research
 from app.services.deep_research import run_pipeline as run_deep_research_pipeline
-from app.services.rag import build_context, build_messages, run_library_search
+from app.services.rag import (
+    build_context,
+    build_excerpt_context,
+    build_excerpt_messages,
+    build_messages,
+    run_library_search,
+)
 from app.services.search_providers import run_search
 from app.services.search_summary import build_search_summary_messages
 from app.services.streaming import stream_chat_completion
@@ -53,14 +60,7 @@ async def _sources_payload(chat_doc: dict) -> dict:
     }
 
 
-@router.post("", status_code=201)
-async def create_chat(body: ChatCreate):
-    if body.type == ChatType.chat_with_pdf and not body.sourceFolderIds and not body.sourcePaperIds:
-        raise HTTPException(400, "At least one source folder or paper is required")
-    if body.type == ChatType.deep_research:
-        if body.deepResearchScope == DeepResearchScope.folder and not body.sourceFolderIds:
-            raise HTTPException(400, "A folder is required for folder-scoped Deep Research")
-
+async def _build_and_insert_chat(body: ChatCreate) -> dict:
     source_folder_oids = [ObjectId(fid) for fid in body.sourceFolderIds]
     source_paper_oids = [ObjectId(pid) for pid in body.sourcePaperIds]
 
@@ -88,6 +88,41 @@ async def create_chat(body: ChatCreate):
     }
     result = await chats.insert_one(doc)
     doc["_id"] = result.inserted_id
+    return doc
+
+
+@router.post("", status_code=201)
+async def create_chat(body: ChatCreate):
+    if body.type == ChatType.chat_with_pdf and not body.sourceFolderIds and not body.sourcePaperIds:
+        raise HTTPException(400, "At least one source folder or paper is required")
+    if body.type == ChatType.deep_research:
+        if body.deepResearchScope == DeepResearchScope.folder and not body.sourceFolderIds:
+            raise HTTPException(400, "A folder is required for folder-scoped Deep Research")
+
+    doc = await _build_and_insert_chat(body)
+    out = serialize_doc(doc)
+    out["sources"] = await _sources_payload(doc)
+    return out
+
+
+@router.get("/for-paper/{paper_id}")
+async def get_or_create_chat_for_paper(paper_id: str):
+    """Find-or-create the single-paper `chat_with_pdf` chat for a given paper, so the
+    Reader always resumes the same conversation instead of creating a new chat on
+    every visit. Deliberately exact-matches `sourcePaperIds == [paper_id]` with no
+    folder sources — a chat that also includes other papers/folders doesn't count as
+    "the" chat for this paper.
+    """
+    existing = await chats.find_one(
+        {
+            "type": ChatType.chat_with_pdf.value,
+            "sourcePaperIds": [ObjectId(paper_id)],
+            "sourceFolderIds": [],
+        }
+    )
+    doc = existing or await _build_and_insert_chat(
+        ChatCreate(type=ChatType.chat_with_pdf, sourcePaperIds=[paper_id])
+    )
     out = serialize_doc(doc)
     out["sources"] = await _sources_payload(doc)
     return out
@@ -147,11 +182,19 @@ async def add_source(chat_id: str, body: AddSourceRequest):
     return out
 
 
-async def _stream_chat_with_pdf(chat_doc: dict, content: str, history: list[dict]):
-    source_folder_ids = [str(fid) for fid in chat_doc.get("sourceFolderIds", [])]
-    source_paper_ids = [str(pid) for pid in chat_doc.get("sourcePaperIds", [])]
-    context, sources = await build_context(source_folder_ids, source_paper_ids, content)
-    messages = build_messages(context, sources, history, content)
+async def _stream_chat_with_pdf(
+    chat_doc: dict, content: str, history: list[dict], excerpt: ExcerptRef | None = None
+):
+    if excerpt is not None:
+        context, page_label = await build_excerpt_context(excerpt.paperId, excerpt.page)
+        paper_doc = await papers.find_one({"_id": ObjectId(excerpt.paperId)}, {"title": 1})
+        paper_title = paper_doc.get("title", "Untitled") if paper_doc else "Untitled"
+        messages = build_excerpt_messages(excerpt.quote, context, page_label, paper_title, history, content)
+    else:
+        source_folder_ids = [str(fid) for fid in chat_doc.get("sourceFolderIds", [])]
+        source_paper_ids = [str(pid) for pid in chat_doc.get("sourcePaperIds", [])]
+        context, sources = await build_context(source_folder_ids, source_paper_ids, content)
+        messages = build_messages(context, sources, history, content)
 
     async for event in stream_chat_completion(messages):
         payload = json.loads(event[len("data: ") : -2])
@@ -240,7 +283,10 @@ async def send_message(chat_id: str, body: MessageCreate):
 
     history = chat_doc.get("messages", [])
     is_first_message = len(history) == 0
-    await _append_message(chat_doc["_id"], {"role": "user", "content": body.content})
+    user_message: dict = {"role": "user", "content": body.content}
+    if body.excerpt:
+        user_message["excerpt"] = body.excerpt.model_dump()
+    await _append_message(chat_doc["_id"], user_message)
 
     chat_type = chat_doc.get("type", ChatType.chat_with_pdf.value)
 
@@ -257,6 +303,6 @@ async def send_message(chat_id: str, body: MessageCreate):
     elif chat_type == ChatType.search.value:
         event_stream = _stream_search(chat_doc, body.content)
     else:
-        event_stream = _stream_chat_with_pdf(chat_doc, body.content, history)
+        event_stream = _stream_chat_with_pdf(chat_doc, body.content, history, body.excerpt)
 
     return StreamingResponse(event_stream, media_type="text/event-stream")

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -48,3 +49,17 @@ class PaperUpdate(BaseModel):
     folderId: str | None = None
     tagIds: list[str] | None = None
     title: str | None = None
+
+
+class HighlightRect(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
+
+class HighlightCreate(BaseModel):
+    page: int
+    color: Literal["yellow", "green", "blue", "pink"]
+    rects: list[HighlightRect]
+    quote: str

@@ -1,10 +1,20 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { api } from './client'
-import type { Chat, ChatSummary, ChatType, DeepResearchMode, DeepResearchScope, MessageOutput, SearchScope } from './types'
+import type {
+  Chat,
+  ChatSummary,
+  ChatType,
+  DeepResearchMode,
+  DeepResearchScope,
+  ExcerptRef,
+  MessageOutput,
+  SearchScope,
+} from './types'
 
 export const chatsApi = {
   list: (type?: ChatType) => api.get<ChatSummary[]>(`/chats${type ? `?type=${type}` : ''}`),
   get: (id: string) => api.get<Chat>(`/chats/${id}`),
+  getForPaper: (paperId: string) => api.get<Chat>(`/chats/for-paper/${paperId}`),
   create: (params: {
     type?: ChatType
     sourceFolderIds?: string[]
@@ -29,12 +39,13 @@ export const chatsApi = {
       onDone: (fullText: string) => void
       onError: (err: unknown) => void
     },
+    excerpt?: ExcerptRef,
   ) => {
     const controller = new AbortController()
     fetchEventSource(`/api/chats/${chatId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, excerpt }),
       signal: controller.signal,
       onmessage(ev) {
         const payload = JSON.parse(ev.data) as {

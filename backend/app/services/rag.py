@@ -13,6 +13,12 @@ source using the bracketed label shown with the excerpt, e.g. [Paper 1, p.3]. If
 excerpts do not contain enough information to answer, say so explicitly rather than
 guessing or using outside knowledge."""
 
+EXCERPT_SYSTEM_PROMPT = """You are a research assistant helping a user understand a
+specific passage they selected while reading a paper. Answer using the selected quote
+and the surrounding context from the same section of the paper. If the context is
+insufficient to answer, say so explicitly rather than guessing or using outside
+knowledge."""
+
 
 @dataclass
 class SourcePaper:
@@ -101,6 +107,39 @@ def _page_label(chunk: dict) -> str:
         if chunk["startPage"] == chunk["endPage"]
         else f"pp.{chunk['startPage']}-{chunk['endPage']}"
     )
+
+
+async def build_excerpt_context(paper_id: str, page: int) -> tuple[str, str]:
+    """Ground an "Ask AI on selected text" question in the paper's own section
+    structure rather than a raw page window: find which section the selected page
+    belongs to, then pull every chunk in that section so the model sees the whole
+    surrounding argument, not an isolated fragment. Falls back to a `page ± 1` window
+    when the anchor chunk has no detected section (legacy data, or a paper with no
+    detectable heading structure).
+    """
+    paper_oid = ObjectId(paper_id)
+    anchor = await paper_chunks.find_one(
+        {"paperId": paper_oid, "startPage": {"$lte": page}, "endPage": {"$gte": page}},
+        sort=[("chunkIndex", 1)],
+    )
+
+    section = anchor.get("section") if anchor else None
+    if section:
+        cursor = paper_chunks.find({"paperId": paper_oid, "section": section}).sort("chunkIndex", 1)
+    else:
+        cursor = paper_chunks.find(
+            {"paperId": paper_oid, "startPage": {"$lte": page + 1}, "endPage": {"$gte": page - 1}}
+        ).sort("chunkIndex", 1)
+
+    chunks = [c async for c in cursor]
+    if not chunks and anchor:
+        chunks = [anchor]
+
+    text = "\n\n".join(c["text"] for c in chunks)
+    start_page = min((c["startPage"] for c in chunks), default=page)
+    end_page = max((c["endPage"] for c in chunks), default=page)
+    page_label = f"p.{start_page}" if start_page == end_page else f"pp.{start_page}-{end_page}"
+    return text, page_label
 
 
 async def build_context(
@@ -231,6 +270,26 @@ def build_messages(
     system_content = (
         f"{SYSTEM_PROMPT}\n\nSources in this conversation:\n{source_list}\n\n"
         f"Relevant excerpts:\n\n{context}"
+    )
+    messages = [{"role": "system", "content": system_content}]
+    messages.extend({"role": m["role"], "content": m["content"]} for m in history)
+    messages.append({"role": "user", "content": user_message})
+    return messages
+
+
+def build_excerpt_messages(
+    quote: str,
+    context: str,
+    page_label: str,
+    paper_title: str,
+    history: list[dict],
+    user_message: str,
+) -> list[dict]:
+    system_content = (
+        f"{EXCERPT_SYSTEM_PROMPT}\n\n"
+        f"Paper: {paper_title}\n\n"
+        f'Selected quote ({page_label}):\n"{quote}"\n\n'
+        f"Surrounding context ({page_label}):\n{context}"
     )
     messages = [{"role": "system", "content": system_content}]
     messages.extend({"role": m["role"], "content": m["content"]} for m in history)

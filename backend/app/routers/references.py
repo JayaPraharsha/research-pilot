@@ -4,10 +4,11 @@ from bson import ObjectId
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.db.mongo import folders, papers, tags
+from app.db.mongo import folders, highlights, papers, tags
 from app.models.common import serialize_doc, utcnow
 from app.models.paper import (
     FromSearchPaperCreate,
+    HighlightCreate,
     IngestionStatus,
     ManualPaperCreate,
     PaperSource,
@@ -152,6 +153,26 @@ async def get_paper_pdf(paper_id: str):
     if not doc or not doc.get("pdfPath") or not Path(doc["pdfPath"]).is_file():
         raise HTTPException(404, "No stored PDF for this paper")
     return FileResponse(doc["pdfPath"], media_type="application/pdf")
+
+
+@router.post("/papers/{paper_id}/highlights", status_code=201)
+async def create_highlight(paper_id: str, body: HighlightCreate):
+    doc = {
+        "paperId": ObjectId(paper_id),
+        "page": body.page,
+        "color": body.color,
+        "rects": [r.model_dump() for r in body.rects],
+        "quote": body.quote,
+        "createdAt": utcnow(),
+    }
+    result = await highlights.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return serialize_doc(doc)
+
+
+@router.get("/papers/{paper_id}/highlights")
+async def list_highlights(paper_id: str):
+    return [serialize_doc(h) async for h in highlights.find({"paperId": ObjectId(paper_id)}).sort("createdAt", 1)]
 
 
 async def _create_paper_stub(

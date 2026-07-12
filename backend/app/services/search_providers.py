@@ -68,12 +68,17 @@ def _arxiv_pdf_url(entry_id: str) -> str:
 
 
 async def search_arxiv(query: str, limit: int) -> list[NormalizedResult]:
+    # Strip quote characters the user may have typed around a title (e.g. pasting
+    # "Attention is All You Need" verbatim) — left in place, they'd nest inside the
+    # phrase-search quotes added below and arXiv silently returns unrelated results
+    # instead of erroring, so the real match never surfaces.
+    clean_query = query.replace('"', "").strip()
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.get(
                 "https://export.arxiv.org/api/query",
                 params={
-                    "search_query": f'all:"{query}"',
+                    "search_query": f'all:"{clean_query}"',
                     "max_results": limit,
                     "sortBy": "relevance",
                     "sortOrder": "descending",

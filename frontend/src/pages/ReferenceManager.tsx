@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { referencesApi } from '../api/references'
 import type { Folder, Paper, Tag } from '../api/types'
 
@@ -12,6 +13,7 @@ function paperSourceLink(p: Paper): { href: string; icon: string; label: string 
 }
 
 export function ReferenceManager() {
+  const navigate = useNavigate()
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [papers, setPapers] = useState<Paper[]>([])
@@ -263,6 +265,14 @@ export function ReferenceManager() {
                 </option>
               ))}
             </select>
+            <button
+              className="btn btn-icon"
+              disabled={p.ingestionStatus !== 'ready'}
+              onClick={() => navigate(`/papers/${p.id}/read`)}
+              title="Read Paper"
+            >
+              📖
+            </button>
             <button className="btn btn-icon" onClick={() => handleDelete(p.id)} title="Delete">
               🗑
             </button>

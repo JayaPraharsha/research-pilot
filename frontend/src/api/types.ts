@@ -78,11 +78,18 @@ export type MessageOutput =
   | { kind: 'papers'; results: SearchResult[] }
   | { kind: 'document'; markdown: string; references: ReportReference[] }
 
+export interface ExcerptRef {
+  paperId: string
+  quote: string
+  page: number
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   createdAt: string
   output?: MessageOutput
+  excerpt?: ExcerptRef
 }
 
 export interface DeepResearchStage {
@@ -118,6 +125,25 @@ export interface ChatSummary {
   sources: ChatSources
   createdAt: string
   updatedAt: string
+}
+
+export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink'
+
+export interface HighlightRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface Highlight {
+  id: string
+  paperId: string
+  page: number
+  color: HighlightColor
+  rects: HighlightRect[]
+  quote: string
+  createdAt: string
 }
 
 export interface Notebook {

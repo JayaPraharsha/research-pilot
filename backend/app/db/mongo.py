@@ -16,6 +16,7 @@ folders = db["folders"]
 tags = db["tags"]
 chats = db["chats"]
 notebooks = db["notebooks"]
+highlights = db["highlights"]
 
 VECTOR_INDEX_NAME = "paper_chunks_vector_index"
 
@@ -32,6 +33,7 @@ async def ensure_indexes() -> None:
     await chats.create_index("updatedAt")
     await chats.create_index("type")
     await notebooks.create_index("updatedAt")
+    await highlights.create_index("paperId")
 
     try:
         existing = [idx async for idx in paper_chunks.list_search_indexes()]

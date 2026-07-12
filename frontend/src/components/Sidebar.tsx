@@ -2,24 +2,24 @@ import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { NotebookPen } from 'lucide-react'
 
-const NAV_ITEMS: { to: string; label: string; icon: ReactNode }[] = [
+const NAV_ITEMS: { to: string; label: string; icon: ReactNode; isAgentGroup?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: '⌂' },
   { to: '/references', label: 'Reference Manager', icon: '▤' },
-  { to: '/?agent=search', label: 'AI Search', icon: '🔍' },
-  { to: '/?agent=chat_with_pdf', label: 'Chat with PDF', icon: '💬' },
-  { to: '/?agent=deep_research', label: 'Deep Research Report', icon: '📄' },
+  { to: '/?agent=search', label: 'Research Agents', icon: '🤖', isAgentGroup: true },
   { to: '/my-chats', label: 'My Chats', icon: '🗂' },
   { to: '/my-notebooks', label: 'My Notebooks', icon: <NotebookPen size={16} /> },
 ]
 
-// NavLink's built-in isActive only compares pathname, so every "/?agent=..." item
-// (plus Dashboard itself) would all match at once — compare the `agent` query param too.
-function isNavItemActive(itemTo: string, pathname: string, search: string) {
-  const [itemPath, itemQuery] = itemTo.split('?')
+// NavLink's built-in isActive only compares pathname, so Dashboard and "Research Agents"
+// (both routed to "/") would always match together — compare the `agent` query param too.
+// "Research Agents" covers all 3 agent types (its own in-page dropdown switches between
+// them, per Dashboard.tsx's AGENTS list), so it's active for *any* agent value, while
+// Dashboard is only active when there's no agent param at all.
+function isNavItemActive(item: { to: string; isAgentGroup?: boolean }, pathname: string, search: string) {
+  const [itemPath] = item.to.split('?')
   if (pathname !== itemPath) return false
   const currentAgent = new URLSearchParams(search).get('agent')
-  const itemAgent = itemQuery ? new URLSearchParams(itemQuery).get('agent') : null
-  return currentAgent === itemAgent
+  return item.isAgentGroup ? currentAgent !== null : currentAgent === null
 }
 
 export function Sidebar() {
@@ -38,7 +38,7 @@ export function Sidebar() {
             // NavLink always appends its own pathname-only "active" class even when className
             // is a string, so it must be a function here to fully replace that logic instead.
             className={() =>
-              `sidebar-nav-item${isNavItemActive(item.to, location.pathname, location.search) ? ' active' : ''}`
+              `sidebar-nav-item${isNavItemActive(item, location.pathname, location.search) ? ' active' : ''}`
             }
           >
             <span className="icon">{item.icon}</span>

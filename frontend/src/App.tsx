@@ -5,6 +5,7 @@ import { ReferenceManager } from './pages/ReferenceManager'
 import { ChatThread } from './pages/ChatThread'
 import { MyChats } from './pages/MyChats'
 import { MyNotebooks } from './pages/MyNotebooks'
+import { ReaderPage } from './pages/ReaderPage'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/references" element={<ReferenceManager />} />
+          <Route path="/papers/:id/read" element={<ReaderPage />} />
           <Route path="/chats/:chatId" element={<ChatThread />} />
           <Route path="/my-chats" element={<MyChats />} />
           <Route path="/my-notebooks" element={<MyNotebooks />} />
