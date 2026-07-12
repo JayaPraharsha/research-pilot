@@ -32,7 +32,9 @@ export interface Paper {
 }
 
 export type ChatType = 'chat_with_pdf' | 'search' | 'deep_research'
-export type DeepResearchScope = 'external' | 'folder'
+export type DeepResearchScope = 'external' | 'arxiv' | 'folder'
+export type DeepResearchMode = 'standard' | 'openai'
+export type SearchScope = 'all_papers' | 'arxiv' | 'reference_manager'
 
 export interface ChatFolderRef {
   id: string
@@ -84,7 +86,9 @@ export interface ChatMessage {
 }
 
 export interface DeepResearchStage {
-  name: 'plan' | 'search' | 'screen' | 'extract' | 'synthesize'
+  // 'plan'/'search'/'screen'/'extract'/'synthesize' for the standard pipeline;
+  // 'planning'/'research' for the OpenAI deep-research mode.
+  name: string
   status: 'pending' | 'running' | 'done'
   detail?: string
 }
@@ -96,6 +100,8 @@ export interface Chat {
   sourceFolderIds: string[]
   sourcePaperIds: string[]
   deepResearchScope: DeepResearchScope | null
+  deepResearchMode: DeepResearchMode | null
+  searchScope: SearchScope | null
   deepResearchStages: DeepResearchStage[] | null
   sources: ChatSources
   messages: ChatMessage[]
@@ -117,7 +123,15 @@ export interface ChatSummary {
 export interface Notebook {
   id: string
   title: string
-  chatId: string
-  sourcePaperIds: string[]
+  content: string
   createdAt: string
+  updatedAt: string
+}
+
+export interface NotebookSummary {
+  id: string
+  title: string
+  snippet: string
+  createdAt: string
+  updatedAt: string
 }

@@ -4,11 +4,22 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.config import settings
 from app.db.mongo import chats, folders, papers
-from app.models.chat import AddSourceRequest, ChatCreate, ChatRename, ChatType, DeepResearchScope, MessageCreate
+from app.models.chat import (
+    AddSourceRequest,
+    ChatCreate,
+    ChatRename,
+    ChatType,
+    DeepResearchMode,
+    DeepResearchScope,
+    MessageCreate,
+    SearchScope,
+)
 from app.models.common import serialize_doc, utcnow
+from app.services.deep_research import run_openai_deep_research
 from app.services.deep_research import run_pipeline as run_deep_research_pipeline
-from app.services.rag import build_context, build_messages
+from app.services.rag import build_context, build_messages, run_library_search
 from app.services.search_providers import run_search
 from app.services.search_summary import build_search_summary_messages
 from app.services.streaming import stream_chat_completion
@@ -68,6 +79,8 @@ async def create_chat(body: ChatCreate):
         "sourceFolderIds": source_folder_oids,
         "sourcePaperIds": source_paper_oids,
         "deepResearchScope": body.deepResearchScope.value if body.deepResearchScope else None,
+        "deepResearchMode": body.deepResearchMode.value if body.deepResearchMode else None,
+        "searchScope": body.searchScope.value if body.searchScope else None,
         "deepResearchStages": None,
         "messages": [],
         "createdAt": now,
@@ -148,7 +161,15 @@ async def _stream_chat_with_pdf(chat_doc: dict, content: str, history: list[dict
 
 
 async def _stream_search(chat_doc: dict, content: str):
-    results = await run_search(content)
+    search_scope = chat_doc.get("searchScope")
+    if search_scope == SearchScope.reference_manager.value:
+        source_folder_ids = [str(fid) for fid in chat_doc.get("sourceFolderIds", [])]
+        source_paper_ids = [str(pid) for pid in chat_doc.get("sourcePaperIds", [])]
+        results = await run_library_search(source_folder_ids, source_paper_ids, content, settings.search_result_limit)
+    elif search_scope == SearchScope.arxiv.value:
+        results = await run_search(content, providers=["arxiv"])
+    else:
+        results = await run_search(content)
     results_payload = [
         {
             "title": r.title,
@@ -224,10 +245,13 @@ async def send_message(chat_id: str, body: MessageCreate):
     chat_type = chat_doc.get("type", ChatType.chat_with_pdf.value)
 
     if chat_type == ChatType.deep_research.value and is_first_message:
-        scope = DeepResearchScope(chat_doc["deepResearchScope"])
-        folder_ids = chat_doc.get("sourceFolderIds", [])
-        folder_id = str(folder_ids[0]) if folder_ids else None
-        event_stream = run_deep_research_pipeline(chat_id, body.content, scope, folder_id)
+        if chat_doc.get("deepResearchMode") == DeepResearchMode.openai.value:
+            event_stream = run_openai_deep_research(chat_id, body.content)
+        else:
+            scope = DeepResearchScope(chat_doc["deepResearchScope"])
+            folder_ids = chat_doc.get("sourceFolderIds", [])
+            folder_id = str(folder_ids[0]) if folder_ids else None
+            event_stream = run_deep_research_pipeline(chat_id, body.content, scope, folder_id)
     elif chat_type == ChatType.deep_research.value:
         event_stream = _stream_deep_research_followup(chat_doc, body.content, history)
     elif chat_type == ChatType.search.value:

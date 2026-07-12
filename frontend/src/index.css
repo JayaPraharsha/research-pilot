@@ -353,6 +353,104 @@ a {
   border-radius: var(--radius-md);
 }
 
+/* ---------- Dashboard suggestions ---------- */
+
+.suggestions-section {
+  margin-top: 32px;
+}
+
+.suggestions-title {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.suggestions-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.suggestion-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.suggestion-chip:hover {
+  background: var(--sidebar-hover);
+}
+
+.suggestions-category {
+  margin-bottom: 18px;
+}
+
+.suggestions-category-label {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.suggestions-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.suggestion-pill {
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-full);
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.suggestion-pill:hover {
+  background: var(--sidebar-hover);
+}
+
+.suggestions-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.suggestion-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+  background: white;
+}
+
+.suggestion-card:hover {
+  background: var(--sidebar-hover);
+}
+
+.suggestion-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.suggestion-card-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
 /* ---------- Reference Manager ---------- */
 
 .reference-manager {
@@ -810,10 +908,153 @@ a.paper-row-title-link:hover .paper-row-title-icon {
   text-decoration: underline;
 }
 
-.chat-loading {
+.dr-stages {
+  display: flex;
+  flex-direction: column;
+}
+
+.dr-stage {
+  display: flex;
+  gap: 10px;
+}
+
+.dr-stage-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.dr-stage-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  color: #fff;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.dr-stage-line {
+  width: 2px;
+  flex: 1;
+  min-height: 14px;
+  background: var(--border);
+  margin: 2px 0;
+  transition: background 0.25s ease;
+}
+
+.dr-stage-text {
+  padding-bottom: 14px;
+  font-size: 13.5px;
+}
+
+.dr-stage-label {
   color: var(--text-muted);
-  font-size: 13px;
-  font-style: italic;
+}
+
+.dr-stage-detail {
+  color: var(--text-muted);
+  animation: dr-fade-in 0.3s ease;
+}
+
+.dr-stage--running .dr-stage-icon {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 0 var(--accent-soft);
+  animation: dr-pulse 1.4s ease-out infinite;
+}
+
+.dr-stage--running .dr-stage-label {
+  color: var(--text);
+}
+
+.dr-stage--done .dr-stage-icon {
+  border-color: var(--accent);
+  background: var(--accent);
+  animation: dr-pop 0.25s ease;
+}
+
+.dr-stage--done .dr-stage-line {
+  background: var(--accent);
+}
+
+.dr-stage--done .dr-stage-label {
+  color: var(--text);
+}
+
+@keyframes dr-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgba(249, 115, 22, 0);
+  }
+}
+
+@keyframes dr-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes dr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chat-loading-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.chat-loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: chat-loading-bounce 1s ease-in-out infinite;
+}
+
+.chat-loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes chat-loading-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 .quick-actions {
@@ -857,4 +1098,293 @@ a.paper-row-title-link:hover .paper-row-title-icon {
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
+}
+
+/* ---------- My Notebooks page ---------- */
+
+.notebooks-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.notebooks-page-heading {
+  margin-bottom: 16px;
+}
+
+/* ---------- Per-message "Save to Notes" ---------- */
+
+.chat-bubble-actions {
+  margin-top: 6px;
+}
+
+.btn-save-note {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  opacity: 0.75;
+}
+
+.btn-save-note:hover {
+  opacity: 1;
+}
+
+/* ---------- Save-to-note modal tabs ---------- */
+
+.notes-modal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.notes-modal-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.notes-modal-tab.active {
+  background: var(--sidebar-hover);
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* ---------- Notes panel (embedded in chat, or the full My Notebooks page) ---------- */
+
+.notes-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.notes-panel--panel {
+  width: 360px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+
+.notes-panel--page {
+  flex: 1;
+}
+
+.notes-list-pane {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+  gap: 8px;
+}
+
+.notes-panel--panel .notes-list-pane {
+  width: 100%;
+}
+
+.notes-panel--page .notes-list-pane {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+
+.notes-list-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.notes-list-header input {
+  flex: 1;
+}
+
+.notes-list-item.active {
+  background: var(--sidebar-hover);
+}
+
+.notes-editor-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.notes-editor-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+}
+
+.notes-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notes-title-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: transparent;
+}
+
+.notes-save-status {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.notes-toolbar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-toolbar .btn {
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+.notes-toolbar .btn.active {
+  background: var(--sidebar-hover);
+  border-color: var(--text-muted);
+}
+
+.notes-toolbar .btn-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.notes-toolbar .btn-icon:hover {
+  color: var(--text);
+  background: var(--sidebar-hover);
+  transform: translateY(-1px);
+}
+
+.notes-toolbar .btn-icon.active {
+  color: var(--accent);
+  background: #fde3cf;
+  border-color: var(--accent);
+}
+
+.notes-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 2px 4px;
+}
+
+.notes-editor-content {
+  flex: 1;
+}
+
+/* Tiptap/ProseMirror ships no default CSS at all — these are required, not cosmetic */
+.notes-editor-content .ProseMirror {
+  outline: none;
+  font-size: 13.5px;
+  line-height: 1.6;
+  min-height: 200px;
+}
+
+.notes-editor-content .ProseMirror p {
+  margin: 0 0 0.6em;
+}
+
+.notes-editor-content .ProseMirror h1,
+.notes-editor-content .ProseMirror h2,
+.notes-editor-content .ProseMirror h3 {
+  margin: 0.8em 0 0.4em;
+  font-weight: 600;
+}
+
+.notes-editor-content .ProseMirror h1 {
+  font-size: 20px;
+}
+
+.notes-editor-content .ProseMirror h2 {
+  font-size: 17px;
+}
+
+.notes-editor-content .ProseMirror h3 {
+  font-size: 14.5px;
+}
+
+.notes-editor-content .ProseMirror ul,
+.notes-editor-content .ProseMirror ol {
+  padding-left: 22px;
+  margin: 0 0 0.6em;
+}
+
+.notes-editor-content .ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--text-muted);
+  margin: 0 0 0.6em;
+}
+
+.notes-editor-content .ProseMirror code {
+  background: var(--bg-subtle);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+.notes-editor-content .ProseMirror pre {
+  background: var(--bg-subtle);
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.notes-editor-content .ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+.notes-editor-content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1em 0;
+}
+
+.notes-editor-content .ProseMirror mark {
+  background: #fde3cf;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.notes-editor-content .ProseMirror a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Placeholder extension requires exactly this selector to show its hint text */
+.notes-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }

@@ -1,6 +1,6 @@
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { api } from './client'
-import type { Chat, ChatSummary, ChatType, DeepResearchScope, MessageOutput } from './types'
+import type { Chat, ChatSummary, ChatType, DeepResearchMode, DeepResearchScope, MessageOutput, SearchScope } from './types'
 
 export const chatsApi = {
   list: (type?: ChatType) => api.get<ChatSummary[]>(`/chats${type ? `?type=${type}` : ''}`),
@@ -11,6 +11,8 @@ export const chatsApi = {
     sourcePaperIds?: string[]
     title?: string
     deepResearchScope?: DeepResearchScope
+    deepResearchMode?: DeepResearchMode
+    searchScope?: SearchScope
   }) => api.post<Chat>('/chats', params),
   rename: (id: string, title: string) => api.patch<Chat>(`/chats/${id}`, { title }),
   remove: (id: string) => api.delete(`/chats/${id}`),

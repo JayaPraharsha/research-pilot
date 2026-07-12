@@ -1,13 +1,15 @@
+import type { ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { NotebookPen } from 'lucide-react'
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/', label: 'Dashboard', icon: '⌂' },
   { to: '/references', label: 'Reference Manager', icon: '▤' },
   { to: '/?agent=search', label: 'AI Search', icon: '🔍' },
   { to: '/?agent=chat_with_pdf', label: 'Chat with PDF', icon: '💬' },
   { to: '/?agent=deep_research', label: 'Deep Research Report', icon: '📄' },
   { to: '/my-chats', label: 'My Chats', icon: '🗂' },
-  { to: '/my-notebooks', label: 'My Notebooks', icon: '📓' },
+  { to: '/my-notebooks', label: 'My Notebooks', icon: <NotebookPen size={16} /> },
 ]
 
 // NavLink's built-in isActive only compares pathname, so every "/?agent=..." item

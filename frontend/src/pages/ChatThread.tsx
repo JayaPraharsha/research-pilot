@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { NotebookPen, ArrowLeft, Check } from 'lucide-react'
 import { chatsApi } from '../api/chats'
-import { notebooksApi } from '../api/notebooks'
 import { referencesApi } from '../api/references'
 import type { Chat, ChatMessage, DeepResearchStage, MessageOutput } from '../api/types'
 import { ReferencePickerModal, type ReferencePickerSelection } from '../components/ReferencePickerModal'
 import { Markdown } from '../components/Markdown'
+import { NotebooksPanel } from '../components/NotebooksPanel'
+import { SaveToNotebookModal } from '../components/SaveToNotebookModal'
+import { SaveToFolderModal } from '../components/SaveToFolderModal'
 
 const QUICK_ACTIONS = [
   'Summarize the paper(s)',
@@ -22,12 +25,14 @@ const TYPE_LABEL: Record<Chat['type'], string> = {
   deep_research: 'Deep Research Report',
 }
 
-const STAGE_LABEL: Record<DeepResearchStage['name'], string> = {
+const STAGE_LABEL: Record<string, string> = {
   plan: 'Planning research angles',
   search: 'Searching for papers',
   screen: 'Screening candidates',
   extract: 'Extracting findings',
   synthesize: 'Writing report',
+  planning: 'Expanding your question',
+  research: 'Researching',
 }
 
 export function ChatThread() {
@@ -41,8 +46,11 @@ export function ChatThread() {
   const [liveStages, setLiveStages] = useState<DeepResearchStage[] | null>(null)
   const [pending, setPending] = useState(false)
   const [showAddSource, setShowAddSource] = useState(false)
-  const [savingNotebook, setSavingNotebook] = useState(false)
   const [selectedOutputIdx, setSelectedOutputIdx] = useState<number | null>(null)
+  const [showNotesPanel, setShowNotesPanel] = useState(false)
+  const [saveTarget, setSaveTarget] = useState<{ messageIdx: number; text: string } | null>(null)
+  const [savedMessageIdx, setSavedMessageIdx] = useState<number | null>(null)
+  const [noteUpdateSignal, setNoteUpdateSignal] = useState<{ noteId: string; version: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sentInitialRef = useRef(false)
 
@@ -84,20 +92,34 @@ export function ChatThread() {
     )
     setStreamingText('')
     setLiveOutput(null)
-    setLiveStages(chat?.type === 'deep_research' && chat.messages.length === 0 ? [
-      { name: 'plan', status: 'pending' },
-      { name: 'search', status: 'pending' },
-      { name: 'screen', status: 'pending' },
-      { name: 'extract', status: 'pending' },
-      { name: 'synthesize', status: 'pending' },
-    ] : null)
+    setLiveStages(
+      chat?.type === 'deep_research' && chat.messages.length === 0
+        ? chat.deepResearchMode === 'openai'
+          ? [
+              { name: 'planning', status: 'pending' },
+              { name: 'research', status: 'pending' },
+            ]
+          : [
+              { name: 'plan', status: 'pending' },
+              { name: 'search', status: 'pending' },
+              { name: 'screen', status: 'pending' },
+              { name: 'extract', status: 'pending' },
+              { name: 'synthesize', status: 'pending' },
+            ]
+        : null,
+    )
 
     chatsApi.streamMessage(chatId, content, {
       onOutput: (output) => setLiveOutput(output),
       onStage: ({ stage, status, detail }) => {
-        setLiveStages((prev) =>
-          (prev ?? []).map((s) => (s.name === stage ? { ...s, status: status as DeepResearchStage['status'], detail } : s)),
-        )
+        setLiveStages((prev) => {
+          const list = prev ?? []
+          const existing = list.find((s) => s.name === stage)
+          if (!existing) {
+            return [...list, { name: stage, status: status as DeepResearchStage['status'], detail }]
+          }
+          return list.map((s) => (s.name === stage ? { ...s, status: status as DeepResearchStage['status'], detail } : s))
+        })
       },
       onDelta: (delta) => setStreamingText((prev) => (prev ?? '') + delta),
       onDone: () => {
@@ -136,17 +158,6 @@ export function ChatThread() {
     load()
   }
 
-  async function handleSaveToNotebook() {
-    if (!chatId || !chat) return
-    setSavingNotebook(true)
-    try {
-      await notebooksApi.create(chatId, chat.title)
-      alert('Saved to My Notebooks')
-    } finally {
-      setSavingNotebook(false)
-    }
-  }
-
   function downloadMarkdown(markdown: string, filename: string) {
     const blob = new Blob([markdown], { type: 'text/markdown' })
     const url = URL.createObjectURL(blob)
@@ -179,11 +190,17 @@ export function ChatThread() {
               ))}
             </select>
           )}
-          {chat.type === 'chat_with_pdf' && (
-            <button className="btn" onClick={handleSaveToNotebook} disabled={savingNotebook}>
-              📓 Save to Notebook
-            </button>
-          )}
+          <button className="btn" onClick={() => setShowNotesPanel((v) => !v)}>
+            {showNotesPanel ? (
+              <>
+                <ArrowLeft size={14} /> Back
+              </>
+            ) : (
+              <>
+                <NotebookPen size={14} /> Notes
+              </>
+            )}
+          </button>
           <button className="btn" onClick={() => navigate('/')}>
             + New Chat
           </button>
@@ -191,32 +208,38 @@ export function ChatThread() {
       </div>
 
       <div className="chat-body">
-        {chat.type === 'chat_with_pdf' && (
-          <div className="chat-sources">
-            <div className="chat-sources-header">
-              <span>
-                Sources ({chat.sources.folders.length + chat.sources.papers.length})
-              </span>
-              <button className="btn" onClick={() => setShowAddSource(true)}>
-                + Add File
-              </button>
-            </div>
-            {chat.sources.folders.map((f) => (
-              <div key={f.id} className="source-card">
-                <div className="source-card-title">📁 {f.name}</div>
-                <div className="source-card-meta">{f.paperCount} paper(s) — whole folder</div>
+        {showNotesPanel ? (
+          <NotebooksPanel variant="panel" externalUpdateSignal={noteUpdateSignal} />
+        ) : (
+          <>
+            {chat.type === 'chat_with_pdf' && (
+              <div className="chat-sources">
+                <div className="chat-sources-header">
+                  <span>
+                    Sources ({chat.sources.folders.length + chat.sources.papers.length})
+                  </span>
+                  <button className="btn" onClick={() => setShowAddSource(true)}>
+                    + Add File
+                  </button>
+                </div>
+                {chat.sources.folders.map((f) => (
+                  <div key={f.id} className="source-card">
+                    <div className="source-card-title">📁 {f.name}</div>
+                    <div className="source-card-meta">{f.paperCount} paper(s) — whole folder</div>
+                  </div>
+                ))}
+                {chat.sources.papers.map((p) => (
+                  <div key={p.id} className="source-card">
+                    <div className="source-card-title">📄 {p.title}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-            {chat.sources.papers.map((p) => (
-              <div key={p.id} className="source-card">
-                <div className="source-card-title">📄 {p.title}</div>
-              </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {(chat.type === 'search' || chat.type === 'deep_research') && (
-          <OutputPanel output={activeOutput} onDownload={downloadMarkdown} onSaved={load} />
+            {(chat.type === 'search' || chat.type === 'deep_research') && (
+              <OutputPanel output={activeOutput} onDownload={downloadMarkdown} onSaved={load} />
+            )}
+          </>
         )}
 
         <div className="chat-thread">
@@ -231,21 +254,60 @@ export function ChatThread() {
             {chat.messages.map((m: ChatMessage, i: number) => (
               <div key={i} className={`chat-bubble ${m.role}`}>
                 {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
+                {m.role === 'assistant' && (
+                  <div className="chat-bubble-actions">
+                    <button
+                      className="btn btn-pill btn-save-note"
+                      onClick={() =>
+                        setSaveTarget({
+                          messageIdx: i,
+                          text: m.output?.kind === 'document' ? m.output.markdown : m.content,
+                        })
+                      }
+                    >
+                      {savedMessageIdx === i ? (
+                        <>
+                          <Check size={13} /> Saved
+                        </>
+                      ) : (
+                        <>
+                          <NotebookPen size={13} /> Save to Notes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {liveStages && (
               <div className="chat-bubble assistant">
-                {liveStages.map((s) => (
-                  <div key={s.name} style={{ marginBottom: 4 }}>
-                    {s.status === 'done' ? '✅' : s.status === 'running' ? '⏳' : '⬜'} {STAGE_LABEL[s.name]}
-                    {s.detail ? ` — ${s.detail}` : ''}
-                  </div>
-                ))}
+                <div className="dr-stages">
+                  {liveStages.map((s, idx) => (
+                    <div key={s.name} className={`dr-stage dr-stage--${s.status}`}>
+                      <div className="dr-stage-rail">
+                        <span className="dr-stage-icon">{s.status === 'done' && '✓'}</span>
+                        {idx < liveStages.length - 1 && <span className="dr-stage-line" />}
+                      </div>
+                      <div className="dr-stage-text">
+                        <span className="dr-stage-label">{STAGE_LABEL[s.name]}</span>
+                        {s.detail && <span className="dr-stage-detail"> — {s.detail}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             {streamingText !== null && (
               <div className="chat-bubble assistant">
-                {streamingText ? <Markdown>{streamingText}</Markdown> : <span className="chat-loading">Thinking...</span>}
+                {streamingText ? (
+                  <Markdown>{streamingText}</Markdown>
+                ) : (
+                  <span className="chat-loading-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                )}
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -289,6 +351,19 @@ export function ChatThread() {
           excludeFolderIds={chat.sourceFolderIds}
           onClose={() => setShowAddSource(false)}
           onConfirm={handleAddSources}
+        />
+      )}
+
+      {saveTarget && (
+        <SaveToNotebookModal
+          text={saveTarget.text}
+          onClose={() => setSaveTarget(null)}
+          onSaved={(noteId, mode) => {
+            setSavedMessageIdx(saveTarget.messageIdx)
+            setTimeout(() => setSavedMessageIdx(null), 2000)
+            setSaveTarget(null)
+            if (mode === 'append') setNoteUpdateSignal({ noteId, version: Date.now() })
+          }}
         />
       )}
     </div>
@@ -345,9 +420,10 @@ function SearchResultCard({
 }) {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showFolderModal, setShowFolderModal] = useState(false)
   const navigate = useNavigate()
 
-  async function save() {
+  async function save(folderId?: string | null) {
     setSaving(true)
     try {
       const paper = await referencesApi.saveFromSearch({
@@ -360,6 +436,7 @@ function SearchResultCard({
         citationCount: result.citationCount,
         url: result.url,
         pdfUrl: result.pdfUrl,
+        folderId,
       })
       setSaved(true)
       onSaved()
@@ -367,6 +444,11 @@ function SearchResultCard({
     } finally {
       setSaving(false)
     }
+  }
+
+  async function saveToFolder(folderId: string | null) {
+    await save(folderId)
+    setShowFolderModal(false)
   }
 
   async function saveAndChat() {
@@ -392,7 +474,7 @@ function SearchResultCard({
         </div>
       )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn" disabled={saving || saved} onClick={save}>
+        <button className="btn" disabled={saving || saved} onClick={() => setShowFolderModal(true)}>
           {saved ? '✓ Saved' : '+ My References'}
         </button>
         <button className="btn" disabled={saving} onClick={saveAndChat}>
@@ -404,6 +486,9 @@ function SearchResultCard({
           </a>
         )}
       </div>
+      {showFolderModal && (
+        <SaveToFolderModal onClose={() => setShowFolderModal(false)} onConfirm={saveToFolder} />
+      )}
     </div>
   )
 }

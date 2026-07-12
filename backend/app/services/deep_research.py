@@ -61,10 +61,10 @@ async def _stage_plan(query: str) -> list[str]:
     return [query] + [q for q in sub_queries if q and q != query]
 
 
-async def _stage_search_external(sub_queries: list[str]) -> list[Candidate]:
+async def _stage_search_external(sub_queries: list[str], providers: list[str] | None = None) -> list[Candidate]:
     result_lists: list[list[NormalizedResult]] = []
     for sub_query in sub_queries:
-        result_lists.append(await run_search(sub_query, limit=10))
+        result_lists.append(await run_search(sub_query, limit=10, providers=providers))
     merged = dedupe_and_rank(*result_lists)
     return [
         Candidate(
@@ -199,6 +199,16 @@ def _references_list(candidates: list[Candidate]) -> list[dict]:
     ]
 
 
+async def _persist_final_report(chat_id: str, narration: str, markdown: str, references: list[dict]) -> dict:
+    output = {"kind": "document", "markdown": markdown, "references": references}
+    assistant_message = {"role": "assistant", "content": narration, "output": output}
+    await chats.update_one(
+        {"_id": ObjectId(chat_id)},
+        {"$push": {"messages": assistant_message}, "$set": {"updatedAt": utcnow()}},
+    )
+    return output
+
+
 async def run_pipeline(
     chat_id: str, query: str, scope: DeepResearchScope, folder_id: str | None
 ) -> AsyncGenerator[str, None]:
@@ -224,10 +234,11 @@ async def run_pipeline(
         yield await set_stage("plan", "done", f"{len(sub_queries)} search angle(s) identified")
 
         yield await set_stage("search", "running")
-        if scope == DeepResearchScope.external:
-            candidates = await _stage_search_external(sub_queries)
-        else:
+        if scope == DeepResearchScope.folder:
             candidates = await _stage_load_folder(folder_id) if folder_id else []
+        else:
+            providers = ["arxiv"] if scope == DeepResearchScope.arxiv else None
+            candidates = await _stage_search_external(sub_queries, providers=providers)
         yield await set_stage("search", "done", f"{len(candidates)} candidate paper(s) found")
 
         yield await set_stage("screen", "running")
@@ -243,15 +254,111 @@ async def run_pipeline(
         yield await set_stage("synthesize", "done", "Report written")
 
         references = _references_list(candidates)
-        output = {"kind": "document", "markdown": markdown, "references": references}
         narration = f"Generated a Deep Research Report covering {len(candidates)} papers."
-
-        assistant_message = {"role": "assistant", "content": narration, "output": output}
-        await chats.update_one(
-            {"_id": ObjectId(chat_id)},
-            {"$push": {"messages": assistant_message}, "$set": {"updatedAt": utcnow()}},
-        )
+        output = await _persist_final_report(chat_id, narration, markdown, references)
         yield _sse({"done": True, "content": narration, "output": output})
     except Exception:
         logger.exception("Deep research pipeline failed for chat %s", chat_id)
+        yield _sse({"error": "Report generation failed. Please try again."})
+
+
+QUERY_EXPANSION_SYSTEM_PROMPT = """You turn a user's research question into a detailed
+research brief for an autonomous web-research agent. Clarify the scope, list the key
+sub-questions a thorough answer should cover, and note any implicit constraints. Respond
+with the brief as plain text (no preamble, no JSON, no markdown headers) - it will be
+passed directly to the research agent as its instructions."""
+
+
+async def _expand_query_for_deep_research(query: str) -> str:
+    response = await _openai.chat.completions.create(
+        model=settings.chat_model,
+        messages=[
+            {"role": "system", "content": QUERY_EXPANSION_SYSTEM_PROMPT},
+            {"role": "user", "content": query},
+        ],
+    )
+    return response.choices[0].message.content
+
+
+RESEARCH_STAGE_DETAIL = {
+    "response.web_search_call.in_progress": "Preparing a web search…",
+    "response.web_search_call.searching": "Searching the web…",
+    "response.web_search_call.completed": "Reviewed search results",
+}
+
+
+def _openai_references_list(response) -> list[dict]:
+    seen_urls: set[str] = set()
+    references: list[dict] = []
+    for item in response.output:
+        if getattr(item, "type", None) != "message":
+            continue
+        for content in getattr(item, "content", []):
+            for annotation in getattr(content, "annotations", None) or []:
+                if getattr(annotation, "type", None) != "url_citation" or annotation.url in seen_urls:
+                    continue
+                seen_urls.add(annotation.url)
+                references.append(
+                    {
+                        "index": len(references) + 1,
+                        "title": annotation.title,
+                        "authors": [],
+                        "year": None,
+                        "url": annotation.url,
+                        "paperId": None,
+                    }
+                )
+    return references
+
+
+async def run_openai_deep_research(chat_id: str, query: str) -> AsyncGenerator[str, None]:
+    stages = [
+        {"name": "planning", "status": "pending"},
+        {"name": "research", "status": "pending"},
+    ]
+
+    async def set_stage(name: str, status: str, detail: str = "") -> str:
+        for s in stages:
+            if s["name"] == name:
+                s["status"] = status
+                s["detail"] = detail
+        await _persist_stage(chat_id, stages)
+        return _sse({"stage": name, "status": status, "detail": detail})
+
+    try:
+        yield await set_stage("planning", "running", "Expanding your question into a research brief…")
+        brief = await _expand_query_for_deep_research(query)
+        yield await set_stage("planning", "done", brief)
+
+        yield await set_stage("research", "running", "Starting deep research…")
+        stream = await _openai.responses.create(
+            model=settings.deep_research_openai_model,
+            input=brief,
+            background=True,
+            stream=True,
+            tools=[{"type": "web_search_preview"}],
+        )
+
+        final_response = None
+        async for event in stream:
+            detail = RESEARCH_STAGE_DETAIL.get(event.type)
+            if detail:
+                yield await set_stage("research", "running", detail)
+            elif event.type == "response.completed":
+                final_response = event.response
+            elif event.type == "response.failed":
+                raise RuntimeError(f"Deep research response failed: {event.response.error}")
+
+        if final_response is None:
+            raise RuntimeError("Deep research stream ended without a completed response")
+
+        markdown = final_response.output_text
+        references = _openai_references_list(final_response)
+        yield await set_stage("research", "done", f"{len(references)} source(s) cited")
+
+        narration = f"Generated a Deep Research Report covering {len(references)} source(s)."
+        output = await _persist_final_report(chat_id, narration, markdown, references)
+        yield _sse({"done": True, "content": narration, "output": output})
+    except Exception:
+        logger.exception("OpenAI deep research pipeline failed for chat %s", chat_id)
         yield _sse({"error": "Report generation failed. Please try again."})

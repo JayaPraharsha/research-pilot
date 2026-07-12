@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -7,6 +8,7 @@ from difflib import SequenceMatcher
 import httpx
 
 from app.config import settings
+from app.services.ingestion import embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,12 @@ async def search_arxiv(query: str, limit: int) -> list[NormalizedResult]:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             resp = await client.get(
                 "https://export.arxiv.org/api/query",
-                params={"search_query": f"all:{query}", "max_results": limit},
+                params={
+                    "search_query": f'all:"{query}"',
+                    "max_results": limit,
+                    "sortBy": "relevance",
+                    "sortOrder": "descending",
+                },
             )
             resp.raise_for_status()
             xml_text = resp.text
@@ -116,7 +123,7 @@ def _titles_match(a: str, b: str) -> bool:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio() > 0.9
 
 
-def dedupe_and_rank(*result_lists: list[NormalizedResult]) -> list[NormalizedResult]:
+def _dedupe(*result_lists: list[NormalizedResult]) -> list[NormalizedResult]:
     """Combine results from multiple providers, preserving relative order, and drop
     duplicates (matched by DOI or fuzzy title similarity).
     """
@@ -133,16 +140,61 @@ def dedupe_and_rank(*result_lists: list[NormalizedResult]) -> list[NormalizedRes
                     break
             if not is_duplicate:
                 combined.append(candidate)
-    return combined[: settings.search_result_limit]
+    return combined
 
 
-async def run_search(query: str, limit: int | None = None) -> list[NormalizedResult]:
+def dedupe_and_rank(*result_lists: list[NormalizedResult]) -> list[NormalizedResult]:
+    """Dedupe (matched by DOI or fuzzy title similarity), preserving relative order, and
+    truncate to the configured display limit.
+    """
+    return _dedupe(*result_lists)[: settings.search_result_limit]
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+async def rank_by_relevance(query: str, results: list[NormalizedResult]) -> list[NormalizedResult]:
+    """Re-rank results by embedding cosine similarity to the query, since provider-native
+    ordering (especially arXiv's) isn't reliably relevance-sorted across a merged pool.
+    """
+    if not results:
+        return results
+    texts = [query] + [f"{r.title}. {r.abstract or ''}"[:2000] for r in results]
+    vectors = await embed_texts(texts)
+    query_vector, result_vectors = vectors[0], vectors[1:]
+    scored = sorted(
+        zip(results, result_vectors),
+        key=lambda pair: _cosine_similarity(query_vector, pair[1]),
+        reverse=True,
+    )
+    return [result for result, _ in scored]
+
+
+async def run_search(
+    query: str, limit: int | None = None, providers: list[str] | None = None
+) -> list[NormalizedResult]:
+    """Search external providers. `providers` restricts which are queried (e.g. ["arxiv"]
+    for an ArXiv-only scope); omitted/None queries all of them (today's default behavior).
+    """
     limit = limit or settings.search_result_limit
-    semantic_scholar_results, arxiv_results = [], []
+    fetch_limit = min(limit * 2, 40)
+    coros = []
+    if providers is None or "semantic_scholar" in providers:
+        coros.append(search_semantic_scholar(query, fetch_limit))
+    if providers is None or "arxiv" in providers:
+        coros.append(search_arxiv(query, fetch_limit))
+
+    result_lists: list[list[NormalizedResult]] = []
     try:
-        semantic_scholar_results, arxiv_results = await asyncio.gather(
-            search_semantic_scholar(query, limit), search_arxiv(query, limit)
-        )
+        result_lists = await asyncio.gather(*coros)
     except Exception:
         logger.exception("Search provider fan-out failed")
-    return dedupe_and_rank(semantic_scholar_results, arxiv_results)
+    deduped = _dedupe(*result_lists)
+    ranked = await rank_by_relevance(query, deduped)
+    return ranked[:limit]

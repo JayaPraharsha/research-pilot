@@ -5,6 +5,7 @@ from bson import ObjectId
 from app.config import settings
 from app.db.mongo import VECTOR_INDEX_NAME, folders, paper_chunks, papers
 from app.services.ingestion import embed_texts
+from app.services.search_providers import NormalizedResult
 
 SYSTEM_PROMPT = """You are a research assistant helping a user understand academic papers.
 Answer ONLY using the provided source excerpts below. Every factual claim must cite its
@@ -166,6 +167,58 @@ async def build_context(
             blocks.append(f"[{label}, {_page_label(chunk)}]:\n{chunk['text']}")
 
     return "\n\n---\n\n".join(blocks), sources
+
+
+async def run_library_search(
+    source_folder_ids: list[str], source_paper_ids: list[str], query: str, limit: int
+) -> list[NormalizedResult]:
+    """AI Search scoped to the user's own saved References instead of external APIs:
+    vector-search the resolved papers' chunks, then keep the single best-scoring chunk per
+    paper, returning NormalizedResult-shaped results so they can feed the same
+    synthesized-answer flow (search_summary.py) as external search results.
+    """
+    resolved_ids = await resolve_source_paper_ids(source_folder_ids, source_paper_ids)
+    if not resolved_ids:
+        return []
+
+    paper_docs = await papers.find({"_id": {"$in": [ObjectId(pid) for pid in resolved_ids]}}).to_list(
+        length=len(resolved_ids)
+    )
+    papers_by_id = {str(p["_id"]): p for p in paper_docs}
+
+    (query_embedding,) = await embed_texts([query])
+    chunks = await _global_vector_search(
+        [ObjectId(pid) for pid in resolved_ids], query_embedding, settings.global_retrieval_top_n
+    )
+
+    # $vectorSearch orders by relevance descending, so the first chunk seen per paper is its best match.
+    best_chunk_by_paper: dict[str, dict] = {}
+    for chunk in chunks:
+        pid = str(chunk["paperId"])
+        best_chunk_by_paper.setdefault(pid, chunk)
+
+    results: list[NormalizedResult] = []
+    for pid, chunk in best_chunk_by_paper.items():
+        paper = papers_by_id.get(pid)
+        if not paper:
+            continue
+        results.append(
+            NormalizedResult(
+                title=paper.get("title", "Untitled"),
+                authors=paper.get("authors", []),
+                year=paper.get("year"),
+                venue=paper.get("venue"),
+                abstract=paper.get("abstract") or chunk["text"][:500],
+                doi=paper.get("doi"),
+                url=paper.get("sourceUrl"),
+                pdfUrl=None,
+                citationCount=None,
+                source="reference_manager",
+            )
+        )
+        if len(results) >= limit:
+            break
+    return results
 
 
 def build_messages(

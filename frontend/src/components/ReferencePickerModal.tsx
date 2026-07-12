@@ -89,34 +89,22 @@ export function ReferencePickerModal({
           </button>
         </div>
         <div className="modal-body" style={{ display: 'flex', gap: 16, padding: 0 }}>
-          <div
-            style={
-              singleFolder
-                ? { flex: 1, padding: 16, overflowY: 'auto' }
-                : { width: 230, borderRight: '1px solid var(--border)', padding: 16, overflowY: 'auto' }
-            }
-          >
-            {!singleFolder && (
-              <div
-                className={`ref-tree-item${activeFolderId === null ? ' active' : ''}`}
-                onClick={() => setActiveFolderId(null)}
-              >
-                All Papers
-              </div>
-            )}
+          <div style={{ width: 230, borderRight: '1px solid var(--border)', padding: 16, overflowY: 'auto' }}>
+            <div
+              className={`ref-tree-item${activeFolderId === null ? ' active' : ''}`}
+              onClick={() => setActiveFolderId(null)}
+            >
+              All Papers
+            </div>
             {visibleFolders.map((f) => (
-              <div
-                key={f.id}
-                className={`ref-tree-item${activeFolderId === f.id ? ' active' : ''}`}
-                {...(singleFolder ? { onClick: () => toggleFolder(f.id), style: { cursor: 'pointer' } } : {})}
-              >
+              <div key={f.id} className={`ref-tree-item${activeFolderId === f.id ? ' active' : ''}`}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
                   <input
                     type={singleFolder ? 'radio' : 'checkbox'}
                     checked={selectedFolderIds.has(f.id)}
                     onChange={() => toggleFolder(f.id)}
                   />
-                  <span onClick={singleFolder ? undefined : () => setActiveFolderId(f.id)} style={{ flex: 1 }}>
+                  <span onClick={() => setActiveFolderId(f.id)} style={{ flex: 1 }}>
                     {f.name}
                   </span>
                 </label>
@@ -128,33 +116,41 @@ export function ReferencePickerModal({
                 : 'Check a folder to use its entire contents as a source. Click the name to browse and pick individual papers instead.'}
             </div>
           </div>
-          {!singleFolder && (
-            <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
-              <input
-                className="ref-search"
-                style={{ width: '100%', marginBottom: 8 }}
-                placeholder="Search references..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {loading && <div className="empty-state">Loading...</div>}
-              {!loading && visiblePapers.length === 0 && <div className="empty-state">No papers found.</div>}
-              {visiblePapers.map((p) => (
-                <label key={p.id} className="checkbox-row">
+          <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
+            <input
+              className="ref-search"
+              style={{ width: '100%', marginBottom: 8 }}
+              placeholder="Search references..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {loading && <div className="empty-state">Loading...</div>}
+            {!loading && visiblePapers.length === 0 && <div className="empty-state">No papers found.</div>}
+            {visiblePapers.map((p) => (
+              <label key={p.id} className="checkbox-row" style={singleFolder ? { cursor: 'default' } : undefined}>
+                {singleFolder ? (
+                  <span style={{ width: 16, textAlign: 'center', color: 'var(--text-muted)' }}>·</span>
+                ) : (
                   <input type="checkbox" checked={selectedPaperIds.has(p.id)} onChange={() => togglePaper(p.id)} />
-                  <div style={{ flex: 1 }}>
-                    <div className="paper-row-title">
-                      {p.title} {p.ingestionStatus === 'ready' && <span className="status-badge status-ready">PDF</span>}
-                    </div>
-                    <div className="paper-row-meta">
-                      {p.type} · {p.year ?? '—'} · {p.authors.slice(0, 2).join(', ')}
-                      {p.authors.length > 2 ? ` +${p.authors.length - 2} more` : ''}
-                    </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <div className="paper-row-title">
+                    {p.title} {p.ingestionStatus === 'ready' && <span className="status-badge status-ready">PDF</span>}
                   </div>
-                </label>
-              ))}
-            </div>
-          )}
+                  <div className="paper-row-meta">
+                    {p.type} · {p.year ?? '—'} · {p.authors.slice(0, 2).join(', ')}
+                    {p.authors.length > 2 ? ` +${p.authors.length - 2} more` : ''}
+                  </div>
+                </div>
+              </label>
+            ))}
+            {singleFolder && (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '8px 0 0' }}>
+                Browsing preview only — papers here aren't individually selectable for Deep Research; pick the whole
+                folder on the left.
+              </div>
+            )}
+          </div>
         </div>
         <div className="modal-footer" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>

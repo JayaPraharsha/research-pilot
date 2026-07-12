@@ -2,9 +2,10 @@ from pydantic import BaseModel
 
 
 class NotebookCreate(BaseModel):
-    chatId: str
     title: str
+    content: str = ""
 
 
-class NotebookRename(BaseModel):
-    title: str
+class NotebookUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None

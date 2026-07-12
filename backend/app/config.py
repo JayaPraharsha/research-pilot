@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     global_retrieval_top_n: int = 25
     search_result_limit: int = 20
     deep_research_screen_keep: int = 15
+    deep_research_openai_model: str = "o4-mini-deep-research"
     cors_origins: str = "http://localhost:5173"
 
     @property

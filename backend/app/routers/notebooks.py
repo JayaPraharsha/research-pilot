@@ -1,26 +1,21 @@
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
 
-from app.db.mongo import chats, notebooks
+from app.db.mongo import notebooks
 from app.models.common import serialize_doc, utcnow
-from app.models.notebook import NotebookCreate, NotebookRename
+from app.models.notebook import NotebookCreate, NotebookUpdate
 
 router = APIRouter()
 
 
+def _snippet(content: str, length: int = 140) -> str:
+    return " ".join(content.split())[:length]
+
+
 @router.post("", status_code=201)
 async def create_notebook(body: NotebookCreate):
-    chat_doc = await chats.find_one({"_id": ObjectId(body.chatId)})
-    if not chat_doc:
-        raise HTTPException(404, "Chat not found")
-
-    doc = {
-        "title": body.title,
-        "chatId": ObjectId(body.chatId),
-        "messagesSnapshot": chat_doc.get("messages", []),
-        "sourcePaperIds": chat_doc.get("sourcePaperIds", []),
-        "createdAt": utcnow(),
-    }
+    now = utcnow()
+    doc = {"title": body.title, "content": body.content, "createdAt": now, "updatedAt": now}
     result = await notebooks.insert_one(doc)
     doc["_id"] = result.inserted_id
     return serialize_doc(doc)
@@ -29,9 +24,9 @@ async def create_notebook(body: NotebookCreate):
 @router.get("")
 async def list_notebooks():
     result = []
-    async for n in notebooks.find({}).sort("createdAt", -1):
+    async for n in notebooks.find({}).sort("updatedAt", -1):
         out = serialize_doc(n)
-        out.pop("messagesSnapshot", None)
+        out["snippet"] = _snippet(out.pop("content", ""))
         result.append(out)
     return result
 
@@ -45,8 +40,15 @@ async def get_notebook(notebook_id: str):
 
 
 @router.patch("/{notebook_id}")
-async def rename_notebook(notebook_id: str, body: NotebookRename):
-    await notebooks.update_one({"_id": ObjectId(notebook_id)}, {"$set": {"title": body.title}})
+async def update_notebook(notebook_id: str, body: NotebookUpdate):
+    updates = {}
+    if body.title is not None:
+        updates["title"] = body.title
+    if body.content is not None:
+        updates["content"] = body.content
+    if updates:
+        updates["updatedAt"] = utcnow()
+        await notebooks.update_one({"_id": ObjectId(notebook_id)}, {"$set": updates})
     doc = await notebooks.find_one({"_id": ObjectId(notebook_id)})
     if not doc:
         raise HTTPException(404, "Notebook not found")

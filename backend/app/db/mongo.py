@@ -31,7 +31,7 @@ async def ensure_indexes() -> None:
     await folders.create_index("parentId")
     await chats.create_index("updatedAt")
     await chats.create_index("type")
-    await notebooks.create_index("createdAt")
+    await notebooks.create_index("updatedAt")
 
     try:
         existing = [idx async for idx in paper_chunks.list_search_indexes()]
