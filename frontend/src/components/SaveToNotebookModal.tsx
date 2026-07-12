@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { notebooksApi } from '../api/notebooks'
 import type { NotebookSummary } from '../api/types'
+import { EmptyState } from './EmptyState'
 
 interface Props {
   text: string
@@ -49,11 +51,11 @@ export function SaveToNotebookModal({ text, onClose, onSaved }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 480 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           Save to Notes
-          <button className="btn btn-icon" onClick={onClose}>
-            ✕
+          <button className="btn btn-icon" onClick={onClose} aria-label="Close">
+            <X size={16} />
           </button>
         </div>
         <div className="modal-body">
@@ -80,7 +82,9 @@ export function SaveToNotebookModal({ text, onClose, onSaved }: Props) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
-              {filteredNotes.length === 0 && <div className="empty-state">No notes yet — create one instead.</div>}
+              {filteredNotes.length === 0 && (
+                <EmptyState title="No notes yet" description="Create one instead using the tab above." />
+              )}
               {filteredNotes.map((n) => (
                 <label key={n.id} className="checkbox-row">
                   <input

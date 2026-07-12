@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { NotebookPen, ArrowLeft } from 'lucide-react'
+import {
+  NotebookPen,
+  ArrowLeft,
+  FileText,
+  Folder as FolderIcon,
+  BookOpen,
+  Download,
+  MessageCircle,
+  Check,
+  PanelRight,
+} from 'lucide-react'
 import { chatsApi } from '../api/chats'
 import { referencesApi } from '../api/references'
 import type { Chat, MessageOutput } from '../api/types'
@@ -9,6 +19,8 @@ import { Markdown } from '../components/Markdown'
 import { NotebooksPanel } from '../components/NotebooksPanel'
 import { SaveToFolderModal } from '../components/SaveToFolderModal'
 import { ChatPanel } from '../components/ChatPanel'
+import { EmptyState } from '../components/EmptyState'
+import { useToast } from '../toast/ToastContext'
 
 const TYPE_LABEL: Record<Chat['type'], string> = {
   chat_with_pdf: 'Chat with PDF',
@@ -27,6 +39,7 @@ export function ChatThread() {
   const [selectedOutputIdx, setSelectedOutputIdx] = useState<number | null>(null)
   const [showNotesPanel, setShowNotesPanel] = useState(false)
   const [noteUpdateSignal, setNoteUpdateSignal] = useState<{ noteId: string; version: number } | null>(null)
+  const [sidePanelOpen, setSidePanelOpen] = useState(false)
 
   const [initialMessage] = useState<string | undefined>(
     () => (location.state as { initialMessage?: string } | null)?.initialMessage,
@@ -109,6 +122,14 @@ export function ChatThread() {
               </>
             )}
           </button>
+          <button
+            type="button"
+            className="btn btn-icon btn-icon-sm chat-side-panel-toggle"
+            onClick={() => setSidePanelOpen(true)}
+            aria-label="Open sources panel"
+          >
+            <PanelRight size={15} />
+          </button>
           <button className="btn" onClick={() => navigate('/')}>
             + New Chat
           </button>
@@ -127,56 +148,65 @@ export function ChatThread() {
           }}
         />
 
-        {showNotesPanel ? (
-          <NotebooksPanel variant="panel" externalUpdateSignal={noteUpdateSignal} />
-        ) : (
-          <>
-            {chat?.type === 'chat_with_pdf' && (
-              <div className="chat-sources">
-                <div className="chat-sources-header">
-                  <span>
-                    Sources ({chat.sources.folders.length + chat.sources.papers.length})
-                  </span>
-                  <button className="btn" onClick={() => setShowAddSource(true)}>
-                    + Add File
-                  </button>
-                </div>
-                {chat.sources.folders.length === 0 && chat.sources.papers.length === 1 ? (
-                  <>
-                    <div className="source-card">
-                      <div className="source-card-title">📄 {chat.sources.papers[0].title}</div>
-                    </div>
-                    <button
-                      className="btn"
-                      style={{ width: '100%' }}
-                      onClick={() => navigate(`/papers/${chat.sources.papers[0].id}/read`)}
-                    >
-                      📖 Open Reader
+        {sidePanelOpen && <div className="drawer-scrim" onClick={() => setSidePanelOpen(false)} />}
+        <div className={`chat-side-panel${sidePanelOpen ? ' open' : ''}`}>
+          {showNotesPanel ? (
+            <NotebooksPanel variant="panel" externalUpdateSignal={noteUpdateSignal} />
+          ) : (
+            <>
+              {chat?.type === 'chat_with_pdf' && (
+                <div className="chat-sources">
+                  <div className="chat-sources-header">
+                    <span>
+                      Sources ({chat.sources.folders.length + chat.sources.papers.length})
+                    </span>
+                    <button className="btn" onClick={() => setShowAddSource(true)}>
+                      + Add File
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {chat.sources.folders.map((f) => (
-                      <div key={f.id} className="source-card">
-                        <div className="source-card-title">📁 {f.name}</div>
-                        <div className="source-card-meta">{f.paperCount} paper(s) — whole folder</div>
+                  </div>
+                  {chat.sources.folders.length === 0 && chat.sources.papers.length === 1 ? (
+                    <>
+                      <div className="source-card">
+                        <div className="source-card-title">
+                          <FileText size={13} /> {chat.sources.papers[0].title}
+                        </div>
                       </div>
-                    ))}
-                    {chat.sources.papers.map((p) => (
-                      <div key={p.id} className="source-card">
-                        <div className="source-card-title">📄 {p.title}</div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
+                      <button
+                        className="btn"
+                        style={{ width: '100%' }}
+                        onClick={() => navigate(`/papers/${chat.sources.papers[0].id}/read`)}
+                      >
+                        <BookOpen size={14} /> Open Reader
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {chat.sources.folders.map((f) => (
+                        <div key={f.id} className="source-card">
+                          <div className="source-card-title">
+                            <FolderIcon size={13} /> {f.name}
+                          </div>
+                          <div className="source-card-meta">{f.paperCount} paper(s) — whole folder</div>
+                        </div>
+                      ))}
+                      {chat.sources.papers.map((p) => (
+                        <div key={p.id} className="source-card">
+                          <div className="source-card-title">
+                            <FileText size={13} /> {p.title}
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
 
-            {(chat?.type === 'search' || chat?.type === 'deep_research') && (
-              <OutputPanel output={activeOutput} onDownload={downloadMarkdown} onSaved={() => setReloadSignal((v) => v + 1)} />
-            )}
-          </>
-        )}
+              {(chat?.type === 'search' || chat?.type === 'deep_research') && (
+                <OutputPanel output={activeOutput} onDownload={downloadMarkdown} onSaved={() => setReloadSignal((v) => v + 1)} />
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {showAddSource && chat && (
@@ -202,12 +232,16 @@ function OutputPanel({
   onSaved: () => void
 }) {
   if (!output) {
-    return <div className="chat-sources empty-state">No output yet — ask a question to get started.</div>
+    return (
+      <div className="chat-sources">
+        <EmptyState title="No output yet" description="Ask a question to get started." />
+      </div>
+    )
   }
 
   if (output.kind === 'papers') {
     return (
-      <div className="chat-sources" style={{ width: 380 }}>
+      <div className="chat-sources chat-sources--wide">
         <div className="chat-sources-header">
           <span>Papers ({output.results.length})</span>
         </div>
@@ -219,11 +253,11 @@ function OutputPanel({
   }
 
   return (
-    <div className="chat-sources" style={{ width: 420 }}>
+    <div className="chat-sources chat-sources--wide">
       <div className="chat-sources-header">
         <span>Report</span>
         <button className="btn" onClick={() => onDownload(output.markdown, 'deep-research-report.md')}>
-          ⬇ Download .md
+          <Download size={13} /> Download .md
         </button>
       </div>
       <Markdown>{output.markdown}</Markdown>
@@ -244,6 +278,7 @@ function SearchResultCard({
   const [saving, setSaving] = useState(false)
   const [showFolderModal, setShowFolderModal] = useState(false)
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   async function save(folderId?: string | null) {
     setSaving(true)
@@ -271,6 +306,7 @@ function SearchResultCard({
   async function saveToFolder(folderId: string | null) {
     await save(folderId)
     setShowFolderModal(false)
+    showToast('Saved to References')
   }
 
   async function saveAndChat() {
@@ -283,7 +319,7 @@ function SearchResultCard({
   return (
     <div className="source-card">
       <div className="source-card-meta">
-        {rank}. 📖 {result.venue || result.source}
+        {rank}. {result.venue || result.source}
       </div>
       <div className="source-card-title">{result.title}</div>
       <div className="source-card-meta">
@@ -291,20 +327,24 @@ function SearchResultCard({
         {result.authors.length > 2 ? ` +${result.authors.length - 2} more` : ''}
       </div>
       {result.abstract && (
-        <div style={{ background: 'var(--bg-subtle)', padding: 8, borderRadius: 8, fontSize: 12, margin: '6px 0' }}>
-          ✦ {result.abstract.slice(0, 220)}...
-        </div>
+        <div className="search-result-abstract">{result.abstract.slice(0, 220)}...</div>
       )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn" disabled={saving || saved} onClick={() => setShowFolderModal(true)}>
-          {saved ? '✓ Saved' : '+ My References'}
+          {saved ? (
+            <>
+              <Check size={13} /> Saved
+            </>
+          ) : (
+            '+ My References'
+          )}
         </button>
         <button className="btn" disabled={saving} onClick={saveAndChat}>
-          💬 Save & Chat
+          <MessageCircle size={13} /> Save & Chat
         </button>
         {result.pdfUrl && (
           <a className="btn" href={result.pdfUrl} target="_blank" rel="noreferrer">
-            📄 PDF
+            <FileText size={13} /> PDF
           </a>
         )}
       </div>

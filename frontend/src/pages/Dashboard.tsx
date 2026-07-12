@@ -1,15 +1,43 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  Search,
+  MessageCircle,
+  FileText,
+  ChevronDown,
+  Paperclip,
+  ArrowRight,
+  FileSignature,
+  GitCompare,
+  HelpCircle,
+  BookOpen,
+  Hash,
+  Leaf,
+  Cpu,
+  Apple,
+  Stethoscope,
+  HeartPulse,
+  Globe,
+  GraduationCap,
+  Brain,
+  Scale,
+  FlaskConical,
+  Building2,
+  Home as HomeIcon,
+  Lock,
+  type LucideIcon,
+} from 'lucide-react'
 import { chatsApi } from '../api/chats'
 import { notebooksApi } from '../api/notebooks'
 import { referencesApi } from '../api/references'
 import type { ChatSummary, ChatType, DeepResearchMode, NotebookSummary } from '../api/types'
 import { SourceScopeDropdown, type SourceScopeValue } from '../components/SourceScopeDropdown'
+import { EmptyState } from '../components/EmptyState'
 
-const AGENTS: { type: ChatType; label: string; icon: string; description: string }[] = [
-  { type: 'search', label: 'AI Search', icon: '🔍', description: 'Search papers and get cited answers.' },
-  { type: 'chat_with_pdf', label: 'Chat with PDF', icon: '💬', description: 'Ask questions and get cited answers from PDFs.' },
-  { type: 'deep_research', label: 'Deep Research Report', icon: '📄', description: 'Generate a detailed, cited report from papers.' },
+const AGENTS: { type: ChatType; label: string; icon: LucideIcon; description: string }[] = [
+  { type: 'search', label: 'AI Search', icon: Search, description: 'Search papers and get cited answers.' },
+  { type: 'chat_with_pdf', label: 'Chat with PDF', icon: MessageCircle, description: 'Ask questions and get cited answers from PDFs.' },
+  { type: 'deep_research', label: 'Deep Research Report', icon: FileText, description: 'Generate a detailed, cited report from papers.' },
 ]
 
 const TYPE_LABEL: Record<ChatType, string> = {
@@ -18,19 +46,19 @@ const TYPE_LABEL: Record<ChatType, string> = {
   deep_research: 'Deep Research',
 }
 
-const CHAT_WITH_PDF_SUGGESTIONS = [
-  { icon: '📝', label: 'Summarize a research paper' },
-  { icon: '📑', label: 'Compare key claims across papers' },
-  { icon: '❓', label: 'Find evidence for a claim' },
-  { icon: '📖', label: 'Extract the study population' },
-  { icon: '🔎', label: 'Get a brief overview of the topic' },
-  { icon: '🔢', label: 'Extract numbers & metrics' },
+const CHAT_WITH_PDF_SUGGESTIONS: { icon: LucideIcon; label: string }[] = [
+  { icon: FileSignature, label: 'Summarize a research paper' },
+  { icon: GitCompare, label: 'Compare key claims across papers' },
+  { icon: HelpCircle, label: 'Find evidence for a claim' },
+  { icon: BookOpen, label: 'Extract the study population' },
+  { icon: Search, label: 'Get a brief overview of the topic' },
+  { icon: Hash, label: 'Extract numbers & metrics' },
 ]
 
-const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] }[] = [
+const SEARCH_SUGGESTIONS: { category: string; icon: LucideIcon; questions: string[] }[] = [
   {
     category: 'Environment',
-    icon: '🌍',
+    icon: Leaf,
     questions: [
       'What is the association between long-term PM2.5 exposure and cardiovascular mortality?',
       'How does climate change affect the frequency and intensity of heatwaves globally?',
@@ -41,7 +69,7 @@ const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] 
   },
   {
     category: 'Technology',
-    icon: '💻',
+    icon: Cpu,
     questions: [
       'How reliable are common LLM evaluation benchmarks at predicting real-world performance?',
       'How accurate are AI models for detecting breast cancer on mammography?',
@@ -51,7 +79,7 @@ const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] 
   },
   {
     category: 'Fitness & Nutrition',
-    icon: '🍎',
+    icon: Apple,
     questions: [
       'Do ultra-processed foods increase risk of cardiovascular disease and mortality?',
       'Is intermittent fasting more effective than daily calorie restriction for fat loss and metabolic health?',
@@ -62,7 +90,7 @@ const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] 
   },
   {
     category: 'Clinical Medicine',
-    icon: '🩺',
+    icon: Stethoscope,
     questions: [
       'Are GLP-1 receptor agonists effective and safe for long-term weight loss?',
       'Does metformin reduce progression from prediabetes to type 2 diabetes in real-world studies?',
@@ -73,7 +101,7 @@ const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] 
   },
   {
     category: 'Healthcare',
-    icon: '🏃',
+    icon: HeartPulse,
     questions: [
       'Does long-term PM2.5 exposure increase risk of dementia?',
       'What is the association between heat exposure and cardiovascular mortality among outdoor workers?',
@@ -83,44 +111,44 @@ const SEARCH_SUGGESTIONS: { category: string; icon: string; questions: string[] 
   },
 ]
 
-const DEEP_RESEARCH_SUGGESTIONS = [
+const DEEP_RESEARCH_SUGGESTIONS: { icon: LucideIcon; title: string; question: string }[] = [
   {
-    icon: '🌐',
+    icon: Globe,
     title: 'Social media and mental health',
     question: 'How does daily social media use relate to anxiety, depression, or self-esteem in young adults?',
   },
   {
-    icon: '🎓',
+    icon: GraduationCap,
     title: 'AI in education',
     question: 'Does personalized learning with AI tools improve student outcomes compared to traditional instruction?',
   },
   {
-    icon: '🧠',
+    icon: Brain,
     title: 'Sleep and academic performance',
     question: 'How does sleep duration/quality predict grades, attention, and memory in students?',
   },
   {
-    icon: '⚖️',
+    icon: Scale,
     title: 'Bias and fairness in AI',
     question: 'Which bias-mitigation methods most effectively reduce unfair outcomes without hurting performance?',
   },
   {
-    icon: '🧪',
+    icon: FlaskConical,
     title: 'Reproducibility in science',
     question: 'What are the most common causes of failed replication, and which interventions improve reproducibility?',
   },
   {
-    icon: '🏙️',
+    icon: Building2,
     title: 'Urban green spaces and wellbeing',
     question: 'Do nearby parks and green spaces measurably improve mental wellbeing and stress levels in cities?',
   },
   {
-    icon: '🏠',
+    icon: HomeIcon,
     title: 'Remote work and productivity',
     question: 'What impact does remote work have on productivity and job satisfaction across different roles?',
   },
   {
-    icon: '🔒',
+    icon: Lock,
     title: 'Data privacy and user trust',
     question: 'How do privacy policies and consent prompts influence user trust and willingness to share data?',
   },
@@ -141,6 +169,7 @@ export function Dashboard() {
   const [recentNotebooks, setRecentNotebooks] = useState<NotebookSummary[]>([])
   const [creating, setCreating] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     chatsApi.list().then((chats) => setRecentChats(chats.slice(0, 5)))
@@ -215,6 +244,7 @@ export function Dashboard() {
 
       <div className="ask-box">
         <textarea
+          ref={textareaRef}
           placeholder={
             agent === 'search'
               ? 'Ask a research question or topic to find papers and answers...'
@@ -229,23 +259,27 @@ export function Dashboard() {
           <div className="ask-box-controls-left">
             <div className="dropdown">
               <button className="btn btn-pill" onClick={() => setAgentMenuOpen((v) => !v)}>
-                {AGENTS.find((a) => a.type === agent)?.icon} {TYPE_LABEL[agent]} ▾
+                {(() => {
+                  const Icon = AGENTS.find((a) => a.type === agent)?.icon
+                  return Icon ? <Icon size={14} /> : null
+                })()}
+                {TYPE_LABEL[agent]}
+                <ChevronDown size={14} />
               </button>
               {agentMenuOpen && (
                 <div className="dropdown-menu">
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', padding: '4px 10px' }}>Select Research Agent:</div>
+                  <div className="dropdown-section-label">Select Research Agent:</div>
                   {AGENTS.map((a) => (
                     <div
                       key={a.type}
-                      className="dropdown-item"
-                      style={agent === a.type ? { background: 'var(--accent-soft)' } : undefined}
+                      className={`dropdown-item${agent === a.type ? ' selected' : ''}`}
                       onClick={() => {
                         setAgent(a.type)
                         setAgentMenuOpen(false)
                       }}
                     >
                       <span className="dropdown-item-label">
-                        {a.icon} {a.label}
+                        <a.icon size={14} /> {a.label}
                       </span>
                       <span className="dropdown-item-sub">{a.description}</span>
                     </div>
@@ -291,12 +325,18 @@ export function Dashboard() {
                   ? 'Attach a PDF (added to Reference Manager — pick a folder above to use it)'
                   : 'Attach a PDF'
               }
+              aria-label="Attach a PDF"
               onClick={() => fileInputRef.current?.click()}
             >
-              📎
+              <Paperclip size={15} />
             </button>
-            <button className="btn btn-primary btn-icon" onClick={handleSubmit} disabled={creating || !canSubmit}>
-              →
+            <button
+              className="btn btn-primary btn-icon"
+              onClick={handleSubmit}
+              disabled={creating || !canSubmit}
+              aria-label="Submit"
+            >
+              <ArrowRight size={15} />
             </button>
           </div>
         </div>
@@ -308,7 +348,7 @@ export function Dashboard() {
           <div className="suggestions-grid-3col">
             {CHAT_WITH_PDF_SUGGESTIONS.map((s) => (
               <button key={s.label} className="suggestion-chip" onClick={() => setQuestion(s.label)}>
-                <span>{s.icon}</span> {s.label}
+                <s.icon size={15} /> {s.label}
               </button>
             ))}
           </div>
@@ -321,12 +361,12 @@ export function Dashboard() {
           {SEARCH_SUGGESTIONS.map((cat) => (
             <div key={cat.category} className="suggestions-category">
               <div className="suggestions-category-label">
-                {cat.icon} {cat.category}
+                <cat.icon size={15} /> {cat.category}
               </div>
               <div className="suggestions-pill-row">
                 {cat.questions.map((q) => (
                   <button key={q} className="suggestion-pill" onClick={() => setQuestion(q)}>
-                    🔍 {q}
+                    {q}
                   </button>
                 ))}
               </div>
@@ -342,7 +382,7 @@ export function Dashboard() {
             {DEEP_RESEARCH_SUGGESTIONS.map((s) => (
               <button key={s.title} className="suggestion-card" onClick={() => setQuestion(s.question)}>
                 <div className="suggestion-card-title">
-                  {s.icon} {s.title}
+                  <s.icon size={15} /> {s.title}
                 </div>
                 <div className="suggestion-card-desc">{s.question}</div>
               </button>
@@ -353,7 +393,13 @@ export function Dashboard() {
 
       <div className="section-title">Recent Chats</div>
       <div className="card-list">
-        {recentChats.length === 0 && <div className="empty-state">No chats yet.</div>}
+        {recentChats.length === 0 && (
+          <EmptyState
+            title="No chats yet"
+            description="Ask a question above to start your first conversation."
+            action={{ label: 'Ask a question', onClick: () => textareaRef.current?.focus() }}
+          />
+        )}
         {recentChats.map((c) => (
           <div key={c.id} className="list-card" onClick={() => navigate(`/chats/${c.id}`)}>
             <span className="list-card-title">{c.title}</span>
@@ -364,7 +410,7 @@ export function Dashboard() {
 
       <div className="section-title">Recent Notebooks</div>
       <div className="card-list">
-        {recentNotebooks.length === 0 && <div className="empty-state">No notebooks yet.</div>}
+        {recentNotebooks.length === 0 && <EmptyState title="No notebooks yet" description="Notes you save from chats will show up here." />}
         {recentNotebooks.map((n) => (
           <div key={n.id} className="list-card" onClick={() => navigate(`/my-notebooks`)}>
             <span className="list-card-title">{n.title}</span>

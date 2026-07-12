@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Folder as FolderIcon, X } from 'lucide-react'
 import { referencesApi } from '../api/references'
 import type { Folder } from '../api/types'
 
@@ -38,11 +39,11 @@ export function SaveToFolderModal({ onClose, onConfirm }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 380 }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           Select folder to add to References
-          <button className="btn btn-icon" onClick={onClose}>
-            ✕
+          <button className="btn btn-icon" onClick={onClose} aria-label="Close">
+            <X size={16} />
           </button>
         </div>
         <div className="modal-body">
@@ -57,7 +58,7 @@ export function SaveToFolderModal({ onClose, onConfirm }: Props) {
                 checked={selectedFolderId === f.id}
                 onChange={() => setSelectedFolderId(f.id)}
               />
-              📁 {f.name}
+              <FolderIcon size={13} /> {f.name}
             </label>
           ))}
 
@@ -83,8 +84,11 @@ export function SaveToFolderModal({ onClose, onConfirm }: Props) {
           )}
         </div>
         <div className="modal-footer">
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
           <button className="btn btn-primary" disabled={saving} onClick={handleAdd}>
-            {saving ? 'Adding…' : 'Add →'}
+            {saving ? 'Adding…' : 'Add'}
           </button>
         </div>
       </div>

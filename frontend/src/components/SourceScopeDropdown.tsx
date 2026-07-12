@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Folder as FolderIcon, Library, Package, X, ChevronDown } from 'lucide-react'
 import { referencesApi } from '../api/references'
 import type { ChatType, Folder } from '../api/types'
 import { ReferencePickerModal, type ReferencePickerSelection } from './ReferencePickerModal'
@@ -40,7 +41,7 @@ export function SourceScopeDropdown({ agent, value, onChange }: Props) {
 
   const triggerLabel =
     value.kind === 'all_papers' ? 'All Papers' : value.kind === 'arxiv' ? 'ArXiv' : referenceLabel()
-  const triggerIcon = value.kind === 'reference_manager' ? '📁' : '📖'
+  const TriggerIcon = value.kind === 'reference_manager' ? FolderIcon : Library
 
   function handlePickerConfirm(sel: ReferencePickerSelection) {
     onChange({ kind: 'reference_manager', folderIds: sel.folderIds, paperIds: sel.paperIds })
@@ -51,54 +52,62 @@ export function SourceScopeDropdown({ agent, value, onChange }: Props) {
     <>
       <div className="dropdown">
         <button className="btn btn-pill" onClick={() => setOpen((v) => !v)}>
-          {triggerIcon} {triggerLabel} ▾
+          <TriggerIcon size={14} /> {triggerLabel}
+          <ChevronDown size={14} />
         </button>
         {value.kind === 'reference_manager' && (value.folderIds.length > 0 || value.paperIds.length > 0) && (
           <button
             className="btn btn-icon btn-icon-sm"
             title="Clear selection"
+            aria-label="Clear selection"
             style={{ marginLeft: 4 }}
             onClick={() => onChange({ kind: 'all_papers' })}
           >
-            ✕
+            <X size={12} />
           </button>
         )}
         {open && (
           <div className="dropdown-menu">
             {showDatabases && (
               <>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', padding: '4px 10px' }}>Research Databases:</div>
+                <div className="dropdown-section-label">Research Databases:</div>
                 <div
-                  className="dropdown-item"
+                  className={`dropdown-item${value.kind === 'all_papers' ? ' selected' : ''}`}
                   onClick={() => {
                     onChange({ kind: 'all_papers' })
                     setOpen(false)
                   }}
                 >
-                  <span className="dropdown-item-label">📖 All Papers</span>
+                  <span className="dropdown-item-label">
+                    <Library size={14} /> All Papers
+                  </span>
                   <span className="dropdown-item-sub">Search Semantic Scholar + arXiv</span>
                 </div>
                 <div
-                  className="dropdown-item"
+                  className={`dropdown-item${value.kind === 'arxiv' ? ' selected' : ''}`}
                   onClick={() => {
                     onChange({ kind: 'arxiv' })
                     setOpen(false)
                   }}
                 >
-                  <span className="dropdown-item-label">📦 ArXiv</span>
+                  <span className="dropdown-item-label">
+                    <Package size={14} /> ArXiv
+                  </span>
                   <span className="dropdown-item-sub">Explore research preprints from arXiv</span>
                 </div>
               </>
             )}
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', padding: '4px 10px' }}>My References:</div>
+            <div className="dropdown-section-label">My References:</div>
             <div
-              className="dropdown-item"
+              className={`dropdown-item${value.kind === 'reference_manager' ? ' selected' : ''}`}
               onClick={() => {
                 setShowPicker(true)
                 setOpen(false)
               }}
             >
-              <span className="dropdown-item-label">📁 Reference Manager</span>
+              <span className="dropdown-item-label">
+                <FolderIcon size={14} /> Reference Manager
+              </span>
               <span className="dropdown-item-sub">
                 {singleFolder ? 'Pick one folder from your saved papers' : 'Papers you’ve saved in Reference Manager'}
               </span>

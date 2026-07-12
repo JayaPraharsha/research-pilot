@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { NotebookPen, Check, X } from 'lucide-react'
+import { NotebookPen, Check, X, ArrowUp } from 'lucide-react'
 import { chatsApi } from '../api/chats'
 import type { Chat, ChatMessage, DeepResearchStage, ExcerptRef, MessageOutput } from '../api/types'
 import { Markdown } from '../components/Markdown'
 import { SaveToNotebookModal } from '../components/SaveToNotebookModal'
+import { useToast } from '../toast/ToastContext'
 
 const QUICK_ACTIONS = [
   'Summarize the paper(s)',
@@ -52,6 +53,7 @@ export function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const sentInitialRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const { showToast } = useToast()
 
   function load() {
     chatsApi.get(chatId).then((c) => {
@@ -200,7 +202,7 @@ export function ChatPanel({
               {liveStages.map((s, idx) => (
                 <div key={s.name} className={`dr-stage dr-stage--${s.status}`}>
                   <div className="dr-stage-rail">
-                    <span className="dr-stage-icon">{s.status === 'done' && '✓'}</span>
+                    <span className="dr-stage-icon">{s.status === 'done' && <Check size={9} strokeWidth={3} />}</span>
                     {idx < liveStages.length - 1 && <span className="dr-stage-line" />}
                   </div>
                   <div className="dr-stage-text">
@@ -266,8 +268,13 @@ export function ChatPanel({
               }
             }}
           />
-          <button className="btn btn-primary btn-icon" onClick={submitComposer} disabled={pending}>
-            ↑
+          <button
+            className="btn btn-primary btn-icon"
+            onClick={submitComposer}
+            disabled={pending}
+            aria-label="Send message"
+          >
+            <ArrowUp size={16} />
           </button>
         </div>
       </div>
@@ -280,6 +287,7 @@ export function ChatPanel({
             setSavedMessageIdx(saveTarget.messageIdx)
             setTimeout(() => setSavedMessageIdx(null), 2000)
             setSaveTarget(null)
+            showToast(mode === 'append' ? 'Added to note' : 'Saved to a new note')
             onNoteSaved?.(noteId, mode)
           }}
         />

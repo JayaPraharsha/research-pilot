@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import { Link2, Globe, FileText, Upload, FilePen, BookOpen, Trash2, X, Menu } from 'lucide-react'
 import { referencesApi } from '../api/references'
 import type { Folder, Paper, Tag } from '../api/types'
+import { EmptyState } from '../components/EmptyState'
 
 const TAG_COLORS = ['#f97316', '#22c55e', '#3b82f6', '#a855f7', '#ef4444', '#14b8a6']
 
-function paperSourceLink(p: Paper): { href: string; icon: string; label: string } | null {
-  if (p.doi) return { href: `https://doi.org/${p.doi}`, icon: '🔗', label: 'View via DOI' }
-  if (p.sourceUrl) return { href: p.sourceUrl, icon: '🌐', label: 'View source' }
-  if (p.ingestionStatus === 'ready') return { href: `/api/references/papers/${p.id}/pdf`, icon: '📄', label: 'View stored PDF' }
+function paperSourceLink(p: Paper): { href: string; icon: LucideIcon; label: string } | null {
+  if (p.doi) return { href: `https://doi.org/${p.doi}`, icon: Link2, label: 'View via DOI' }
+  if (p.sourceUrl) return { href: p.sourceUrl, icon: Globe, label: 'View source' }
+  if (p.ingestionStatus === 'ready') return { href: `/api/references/papers/${p.id}/pdf`, icon: FileText, label: 'View stored PDF' }
   return null
 }
 
@@ -28,6 +31,8 @@ export function ReferenceManager() {
   const [newTagName, setNewTagName] = useState('')
   const [showNewTag, setShowNewTag] = useState(false)
   const [tagMenuFor, setTagMenuFor] = useState<string | null>(null)
+  const [treeOpen, setTreeOpen] = useState(false)
+  const [papersError, setPapersError] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function refreshFolders() {
@@ -37,6 +42,7 @@ export function ReferenceManager() {
     referencesApi.listTags().then(setTags)
   }
   function refreshPapers() {
+    setPapersError(false)
     referencesApi
       .listPapers({
         folderId: activeFolderId ?? undefined,
@@ -45,6 +51,7 @@ export function ReferenceManager() {
         hasPdf: hasPdfOnly ? true : undefined,
       })
       .then(setPapers)
+      .catch(() => setPapersError(true))
   }
 
   useEffect(refreshFolders, [])
@@ -94,7 +101,8 @@ export function ReferenceManager() {
 
   return (
     <div className="reference-manager">
-      <div className="ref-tree">
+      {treeOpen && <div className="drawer-scrim" onClick={() => setTreeOpen(false)} />}
+      <div className={`ref-tree${treeOpen ? ' open' : ''}`}>
         <div className="dropdown" style={{ width: '100%' }}>
           <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAddMenuOpen((v) => !v)}>
             + Add Papers
@@ -102,15 +110,21 @@ export function ReferenceManager() {
           {addMenuOpen && (
             <div className="dropdown-menu">
               <div className="dropdown-item" onClick={() => setModal('upload-url')}>
-                <span className="dropdown-item-label">🔗 Upload URL or DOI</span>
+                <span className="dropdown-item-label">
+                  <Link2 size={14} /> Upload URL or DOI
+                </span>
                 <span className="dropdown-item-sub">Add a paper from its URL or DOI</span>
               </div>
               <div className="dropdown-item" onClick={() => fileInputRef.current?.click()}>
-                <span className="dropdown-item-label">⬆ Upload File</span>
+                <span className="dropdown-item-label">
+                  <Upload size={14} /> Upload File
+                </span>
                 <span className="dropdown-item-sub">Import a PDF from your device</span>
               </div>
               <div className="dropdown-item" onClick={() => setModal('manual')}>
-                <span className="dropdown-item-label">✎ Add Manually</span>
+                <span className="dropdown-item-label">
+                  <FilePen size={14} /> Add Manually
+                </span>
                 <span className="dropdown-item-sub">Enter citation data by hand</span>
               </div>
             </div>
@@ -190,6 +204,14 @@ export function ReferenceManager() {
 
       <div className="ref-main">
         <div className="ref-toolbar">
+          <button
+            type="button"
+            className="btn btn-icon btn-icon-sm ref-toolbar-tree-toggle"
+            onClick={() => setTreeOpen(true)}
+            aria-label="Open folders and tags"
+          >
+            <Menu size={15} />
+          </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
             <input type="checkbox" checked={hasPdfOnly} onChange={(e) => setHasPdfOnly(e.target.checked)} />
             Has PDF
@@ -198,7 +220,16 @@ export function ReferenceManager() {
           <input className="ref-search" placeholder="Search by title..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        {papers.length === 0 && <div className="empty-state" style={{ margin: 20 }}>No papers yet. Use "Add Papers" to get started.</div>}
+        {papersError && (
+          <EmptyState
+            variant="error"
+            title="Couldn't load papers"
+            action={{ label: 'Retry', onClick: refreshPapers }}
+          />
+        )}
+        {!papersError && papers.length === 0 && (
+          <EmptyState title="No papers yet" description='Use "Add Papers" to get started.' />
+        )}
 
         {papers.map((p) => {
           const link = paperSourceLink(p)
@@ -215,7 +246,9 @@ export function ReferenceManager() {
                   title={link.label}
                 >
                   {p.title}
-                  <span className="paper-row-title-icon">{link.icon}</span>
+                  <span className="paper-row-title-icon">
+                    <link.icon size={11} />
+                  </span>
                 </a>
               ) : (
                 <div className="paper-row-title">{p.title}</div>
@@ -270,11 +303,17 @@ export function ReferenceManager() {
               disabled={p.ingestionStatus !== 'ready'}
               onClick={() => navigate(`/papers/${p.id}/read`)}
               title="Read Paper"
+              aria-label="Read Paper"
             >
-              📖
+              <BookOpen size={14} />
             </button>
-            <button className="btn btn-icon" onClick={() => handleDelete(p.id)} title="Delete">
-              🗑
+            <button
+              className="btn btn-icon btn-danger-ghost"
+              onClick={() => handleDelete(p.id)}
+              title="Delete"
+              aria-label="Delete"
+            >
+              <Trash2 size={14} />
             </button>
           </div>
           )
@@ -308,8 +347,8 @@ function UploadUrlModal({ folderId, onClose, onDone }: { folderId: string | null
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           Upload URL or DOI
-          <button className="btn btn-icon" onClick={onClose}>
-            ✕
+          <button className="btn btn-icon" onClick={onClose} aria-label="Close">
+            <X size={16} />
           </button>
         </div>
         <div className="modal-body">
@@ -364,8 +403,8 @@ function AddManualModal({ folderId, onClose, onDone }: { folderId: string | null
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           Add Manually
-          <button className="btn btn-icon" onClick={onClose}>
-            ✕
+          <button className="btn btn-icon" onClick={onClose} aria-label="Close">
+            <X size={16} />
           </button>
         </div>
         <div className="modal-body">

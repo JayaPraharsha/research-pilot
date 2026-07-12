@@ -18,9 +18,14 @@ import {
   ListOrdered,
   Quote,
   Eraser,
+  ArrowLeft,
+  Trash2,
 } from 'lucide-react'
 import { notebooksApi } from '../api/notebooks'
 import type { NotebookSummary } from '../api/types'
+import { EmptyState } from './EmptyState'
+import { ConfirmModal } from './ConfirmModal'
+import { useToast } from '../toast/ToastContext'
 
 interface Props {
   variant: 'panel' | 'page'
@@ -35,6 +40,8 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null)
   const [activeTitle, setActiveTitle] = useState('')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   const pendingRef = useRef<{ title?: string; content?: string }>({})
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -155,12 +162,13 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
     const created = await notebooksApi.create('Untitled Note')
     await refreshList()
     setActiveNoteId(created.id)
+    showToast('Note created')
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm('Delete this note? This cannot be undone.')) return
     await notebooksApi.remove(id)
     if (activeNoteId === id) setActiveNoteId(null)
+    showToast('Note deleted')
     refreshList()
   }
 
@@ -189,7 +197,7 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
               + New
             </button>
           </div>
-          {filteredNotes.length === 0 && <div className="empty-state">No notes yet.</div>}
+          {filteredNotes.length === 0 && <EmptyState title="No notes yet" description="Create your first note to get started." />}
           {filteredNotes.map((n) => (
             <div
               key={n.id}
@@ -211,8 +219,8 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
             <div className="notes-editor-sticky">
               <div className="notes-editor-header">
                 {variant === 'panel' && (
-                  <button className="btn btn-icon btn-icon-sm" onClick={goBack}>
-                    ←
+                  <button className="btn btn-icon btn-icon-sm" onClick={goBack} aria-label="Back">
+                    <ArrowLeft size={14} />
                   </button>
                 )}
                 <input
@@ -227,8 +235,13 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
                 <span className="notes-save-status">
                   {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved' : ''}
                 </span>
-                <button className="btn btn-icon btn-icon-sm" title="Delete note" onClick={() => handleDelete(activeNoteId)}>
-                  🗑
+                <button
+                  className="btn btn-icon btn-icon-sm btn-danger-ghost"
+                  title="Delete note"
+                  aria-label="Delete note"
+                  onClick={() => setDeleteTargetId(activeNoteId)}
+                >
+                  <Trash2 size={14} />
                 </button>
               </div>
 
@@ -323,10 +336,20 @@ export function NotebooksPanel({ variant, externalUpdateSignal }: Props) {
             </div>
           </div>
         ) : (
-          <div className="empty-state" style={{ margin: 'auto' }}>
-            Select a note or create a new one.
+          <div style={{ margin: 'auto' }}>
+            <EmptyState title="No note selected" description="Select a note or create a new one." />
           </div>
         ))}
+
+      {deleteTargetId && (
+        <ConfirmModal
+          title="Delete this note?"
+          description="This note will be permanently deleted. This can't be undone."
+          confirmLabel="Delete"
+          onClose={() => setDeleteTargetId(null)}
+          onConfirm={() => handleDelete(deleteTargetId)}
+        />
+      )}
     </div>
   )
 }
