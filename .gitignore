@@ -228,3 +228,6 @@ backend/data/
 paper_guide_images/
 paperguide_features.md
 docs/
+
+*.pdf
+deployment.md
