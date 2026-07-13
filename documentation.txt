@@ -29,10 +29,13 @@ This was built to be realistic for a hackathon: the team built the core pieces f
 PDFs, chatting with AI, searching) and then reused them across every feature, instead of
 building each feature from scratch.
 
-2. DATA HANDLING
+2. DATASET & DATA HANDLING
 
-No canned or offline dataset is used — everything is fetched or uploaded live, so results are
-always current:
+ResearchPilot's dataset is the live research paper corpora of arXiv and Semantic Scholar —
+together, tens of millions of academic papers across every field — plus whatever papers and
+books a user uploads themselves. Rather than working from a static, downloaded snapshot, the
+app queries these sources live through their public APIs, so results are always current and
+never go stale:
 
 - Papers and books come from two places: files the user uploads themselves, or live public
   research sources — arXiv and Semantic Scholar.
@@ -69,7 +72,7 @@ NoSQL, document-style database was chosen deliberately, since research papers, c
 notes naturally vary in shape and don't fit neatly into rigid spreadsheet-style tables — and
 because it comes with built-in support for the AI search feature described above.
 
-4. SYSTEM ARCHITECTURE
+4. SYSTEM ARCHITECTURE 
 
 The system is split cleanly into a backend (the "engine" that talks to the AI, the database,
 and outside research sources) and a frontend (the interface the user actually sees and
