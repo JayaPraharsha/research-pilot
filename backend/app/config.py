@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
-    pdf_storage_dir: str = "./data/pdfs"
     chunk_tokens: int = 700
     chunk_overlap_tokens: int = 100
     top_k_per_paper: int = 5
@@ -25,7 +24,6 @@ class Settings(BaseSettings):
     semantic_scholar_api_key: str | None = None
     cors_origins: str = "http://localhost:5173"
     embedding_batch_size: int = 100
-    image_storage_dir: str = "./data/images"
     book_chunk_sizes: list[int] = [2048, 512, 128]
     book_leaf_retrieval_top_k: int = 6
     secret_key: str = "dev-only-insecure-secret-change-me"

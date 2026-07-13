@@ -230,4 +230,8 @@ paperguide_features.md
 docs/
 
 *.pdf
+prompts/
 deployment.md
+prompt_*/
+STATE.MD
+CLAUDE.MD

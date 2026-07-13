@@ -374,16 +374,27 @@ a {
   flex-shrink: 0;
 }
 
+.sidebar-footer-info {
+  min-width: 0;
+  flex: 1;
+}
+
 .sidebar-footer-name {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-footer-email {
   font-size: 11px;
   color: var(--text-muted);
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-main {
