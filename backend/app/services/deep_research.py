@@ -394,7 +394,7 @@ async def run_pipeline(
         yield _sse({"error": error_message})
 
 
-QUERY_EXPANSION_SYSTEM_PROMPT = """You turn a user's research question into a detailed
+QUERY_EXPANSION_SYSTEM_PROMPT = f"""You turn a user's research question into a detailed
 research brief for an autonomous research agent. Clarify the scope, list the key sub-questions
 a thorough answer should cover, and note any implicit constraints. The brief must explicitly
 instruct the agent to:
@@ -407,17 +407,24 @@ instruct the agent to:
   or review articles when possible.
 - Explicitly flag when no academic paper was found for a sub-question, rather than silently
   substituting a non-academic source.
+- Use at most {settings.deep_research_openai_max_sources} total sources and stop searching once
+  that many strong sources are found, prioritizing the most relevant/highly-cited work over
+  exhaustive coverage.
 Respond with the brief as plain text (no preamble, no JSON, no markdown headers) - it will be
 passed directly to the research agent as its instructions."""
 
 
-DEEP_RESEARCH_INSTRUCTIONS = """You are a research assistant producing a Deep Research Report.
+DEEP_RESEARCH_INSTRUCTIONS = f"""You are a research assistant producing a Deep Research Report.
 
 Only use peer-reviewed journal articles, conference papers, and recognized academic preprint
 archives (e.g. arXiv, PubMed, IEEE Xplore, ACM Digital Library, Nature, Science, JSTOR, Google
 Scholar, university/research-institution publications) as sources. Never cite or rely on blogs,
 news articles, marketing pages, or general web content, even as supporting context — if no
 academic source exists for a sub-question, say so explicitly rather than substituting one.
+
+Use at most {settings.deep_research_openai_max_sources} total sources. Stop searching once you
+have that many strong, relevant sources rather than exhaustively continuing — prioritize
+quality and relevance over quantity of searches.
 
 Write the report in Markdown with these sections in order: Executive Summary, Introduction,
 Problem Definition, Background, Current State of Research, Comparison of Existing Methods,

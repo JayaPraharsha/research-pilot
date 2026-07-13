@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     deep_research_screen_keep: int = 15
     deep_research_min_candidates: int = 1
     deep_research_openai_model: str = "o4-mini-deep-research"
+    deep_research_openai_max_sources: int = 6
     semantic_scholar_api_key: str | None = None
     cors_origins: str = "http://localhost:5173"
     embedding_batch_size: int = 100
